@@ -166,6 +166,11 @@ USAGE
     include better documentation and tests.
 
 CHANGES
+    Version 0.13
+
+            Added some installation tests.
+            Numerous internal changes; one or two bug fixes.
+
     Version 0.12
 
             Blessed references to non-hashes are now handled correctly.
@@ -183,6 +188,6 @@ CHANGES
             Various other small updates.
 
 AUTHOR
-    John Nolan jpnolan@op.net August-September 1999. A copyright
+    John Nolan jpnolan@op.net August-November 1999. A copyright
     statment is contained within the source code itself.
 
