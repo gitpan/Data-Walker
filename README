@@ -28,8 +28,7 @@ INSTALLATION
     write access to a Perl lib directory.
 
 USAGE
-    You open an interacive "command-prompt"-style session by
-    invoking the walk function.
+    You open a command-line interface by invoking the walk function.
 
             use Data::Walker;
             Data::Walker->walk( $data_structure );
@@ -72,28 +71,28 @@ USAGE
     Here is a sample interactive session examining this structure
     ('/>' is the prompt):
 
-            />
+            /> 
             /> ls -l
-            a                               ARRAY (3)
-            b                               HASH (4)
-            c                               CODE
-            d                               80
-            e                               SCALAR: 80
+            a               ARRAY                     (3)
+            b               HASH                      (4)
+            c               CODE                      
+            d               scalar                    80
+            e               SCALAR                    80
             /> cd a
             /->{a}> ls -al
-            ..                              HASH (5)
-            .                               ARRAY (3)
-            0                               10
-            1                               20
-            2                               thirty
+            ..              HASH                      (5)
+            .               ARRAY                     (3)
+            0               scalar                    10
+            1               scalar                    20
+            2               scalar                    'thirty'
             /->{a}> cd ../b
             /->{b}> ls -al
-            ..                              HASH (5)
-            .                               HASH (4)
-            w                               forty
-            x                               fifty
-            y                               60
-            z                               SCALAR: 70
+            ..              HASH                      (5)
+            .               HASH                      (4)
+            w               scalar                    'forty'
+            x               scalar                    'fifty'
+            y               scalar                    60
+            z               SCALAR                    70
             /->{b}> cd ..
             /> dump b
             dump--> 'b'
@@ -104,25 +103,25 @@ USAGE
               'w' => 'forty'
             };
             /> ls -al
-            ..                              HASH (5)
-            .                               HASH (5)
-            a                               ARRAY (3)
-            b                               HASH (4)
-            c                               CODE
-            d                               80
-            e                               SCALAR: 80
+            ..              HASH                      (5)
+            .               HASH                      (5)
+            a               ARRAY                     (3)
+            b               HASH                      (4)
+            c               CODE                      
+            d               scalar                    80
+            e               SCALAR                    80
             /> ! $ref->{d} += 3
             eval--> $ref->{d} += 3
             
             83
             /> ls -al
-            ..                              HASH (5)
-            .                               HASH (5)
-            a                               ARRAY (3)
-            b                               HASH (4)
-            c                               CODE
-            d                               83
-            e                               SCALAR: 83
+            ..              HASH                      (5)
+            .               HASH                      (5)
+            a               ARRAY                     (3)
+            b               HASH                      (4)
+            c               CODE                      
+            d               scalar                    83
+            e               SCALAR                    83
             /> 
             
             
@@ -143,24 +142,39 @@ USAGE
 
     For each session, the following items can be configured:
 
-            rootname        (default:  '/' )  How the root node is displayed 
-            refname         (default: 'ref')  how embedded refs are listed
+            rootname        (default:  '/'    ) how the root node is displayed 
+            refname         (default:  'ref'  ) how embedded refs are listed
+            scalarname      (default: 'scalar') how simple scalars are listed
+            undefname       (default: 'undef' ) how simple scalars are listed
+
             maxdepth        (default:   1  )  maximum dump-depth (Data::Dumper)
             indent          (default:   1  )  amount of indent (Data::Dumper)
-            lscolwidth      (default:  30  )  column withs for 'ls' displays
+            lscol1width     (default:  15  )  column widths for 'ls' displays
+            lscol2width     (default:  25  )  column widths for 'ls' displays
 
             showrecursion   (default:   1  )  note recursion in the prompt
+            showids         (default:   0  )  show ref id numbers in ls lists
             skipdoublerefs  (default:   1  )  hop over ref-to-refs during walks
-            truncatescalars (default:   0  )  truncate scalars in 'ls' displays
+            skipwarning     (default:   1  )  warn when hopping over ref-to-refs
+            truncatescalars (default:  37  )  truncate scalars in 'ls' displays
 
             promptchar      (default:  '>' )  customize the session prompt
             arrowhead       (default:  '>' )  ('>' in '->')
             arrowshaft      (default:  '-' )  ('-' in '->')
 
-    This is the initial release of this module. Future releases will
+    This is an alpha release of this module. Future releases will
     include better documentation and tests.
 
 CHANGES
+    Version 0.12
+
+            Blessed references to non-hashes are now handled correctly.
+            Modified the output of "ls" commands (looks different).
+            Added new options:  
+               showids, lscol2width, scalarname, undefname,
+               skipwarning
+            Numerous internal changes.
+
     Version 0.11
 
             Fixed some misspellings in the help information.

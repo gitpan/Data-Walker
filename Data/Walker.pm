@@ -13,11 +13,13 @@ package Data::Walker;
 
 use Carp;
 use Data::Dumper;
+use overload;
+
 use strict;
 
 use vars qw( $VERSION @ISA %Config $AUTOLOAD );
 
-$VERSION = '0.11';
+$VERSION = '0.12';
 sub Version { $VERSION };
 
 ####################################################################
@@ -60,8 +62,7 @@ write access to a Perl lib directory.
 
 =head1 USAGE
 
-You open an interacive "command-prompt"-style session
-by invoking the walk function. 
+You open a command-line interface by invoking the walk function. 
 
 	use Data::Walker;
 	Data::Walker->walk( $data_structure );
@@ -105,28 +106,28 @@ Imagine a data structure like so:
 Here is a sample interactive session examining this structure ('/>' is the prompt):
 
 
-	/>
+	/> 
 	/> ls -l
-	a                               ARRAY (3)
-	b                               HASH (4)
-	c                               CODE
-	d                               80
-	e                               SCALAR: 80
+	a               ARRAY                     (3)
+	b               HASH                      (4)
+	c               CODE                      
+	d               scalar                    80
+	e               SCALAR                    80
 	/> cd a
 	/->{a}> ls -al
-	..                              HASH (5)
-	.                               ARRAY (3)
-	0                               10
-	1                               20
-	2                               thirty
+	..              HASH                      (5)
+	.               ARRAY                     (3)
+	0               scalar                    10
+	1               scalar                    20
+	2               scalar                    'thirty'
 	/->{a}> cd ../b
 	/->{b}> ls -al
-	..                              HASH (5)
-	.                               HASH (4)
-	w                               forty
-	x                               fifty
-	y                               60
-	z                               SCALAR: 70
+	..              HASH                      (5)
+	.               HASH                      (4)
+	w               scalar                    'forty'
+	x               scalar                    'fifty'
+	y               scalar                    60
+	z               SCALAR                    70
 	/->{b}> cd ..
 	/> dump b
 	dump--> 'b'
@@ -137,25 +138,25 @@ Here is a sample interactive session examining this structure ('/>' is the promp
 	  'w' => 'forty'
 	};
 	/> ls -al
-	..                              HASH (5)
-	.                               HASH (5)
-	a                               ARRAY (3)
-	b                               HASH (4)
-	c                               CODE
-	d                               80
-	e                               SCALAR: 80
+	..              HASH                      (5)
+	.               HASH                      (5)
+	a               ARRAY                     (3)
+	b               HASH                      (4)
+	c               CODE                      
+	d               scalar                    80
+	e               SCALAR                    80
 	/> ! $ref->{d} += 3
 	eval--> $ref->{d} += 3
 	
 	83
 	/> ls -al
-	..                              HASH (5)
-	.                               HASH (5)
-	a                               ARRAY (3)
-	b                               HASH (4)
-	c                               CODE
-	d                               83
-	e                               SCALAR: 83
+	..              HASH                      (5)
+	.               HASH                      (5)
+	a               ARRAY                     (3)
+	b               HASH                      (4)
+	c               CODE                      
+	d               scalar                    83
+	e               SCALAR                    83
 	/> 
 	
 	
@@ -177,33 +178,46 @@ were a directory tree.
 
 For each session, the following items can be configured:
 
-	rootname        (default:  '/' )  How the root node is displayed 
-	refname         (default: 'ref')  how embedded refs are listed
+	rootname        (default:  '/'    ) how the root node is displayed 
+	refname         (default:  'ref'  ) how embedded refs are listed
+	scalarname      (default: 'scalar') how simple scalars are listed
+	undefname       (default: 'undef' ) how simple scalars are listed
+
 	maxdepth        (default:   1  )  maximum dump-depth (Data::Dumper)
 	indent          (default:   1  )  amount of indent (Data::Dumper)
-	lscolwidth      (default:  30  )  column withs for 'ls' displays
+	lscol1width     (default:  15  )  column widths for 'ls' displays
+	lscol2width     (default:  25  )  column widths for 'ls' displays
 
 	showrecursion   (default:   1  )  note recursion in the prompt
+	showids         (default:   0  )  show ref id numbers in ls lists
 	skipdoublerefs  (default:   1  )  hop over ref-to-refs during walks
-	truncatescalars (default:   0  )  truncate scalars in 'ls' displays
+	skipwarning     (default:   1  )  warn when hopping over ref-to-refs
+	truncatescalars (default:  37  )  truncate scalars in 'ls' displays
 
 	promptchar      (default:  '>' )  customize the session prompt
 	arrowhead       (default:  '>' )  ('>' in '->')
 	arrowshaft      (default:  '-' )  ('-' in '->')
 
 
-This is the initial release of this module.  Future releases
+This is an alpha release of this module.  Future releases
 will include better documentation and tests.  
 
 =head1 CHANGES
+
+Version 0.12
+
+	Blessed references to non-hashes are now handled correctly.
+	Modified the output of "ls" commands (looks different).
+	Added new options:  
+	   showids, lscol2width, scalarname, undefname,
+	   skipwarning
+	Numerous internal changes.
 
 Version 0.11
 
 	Fixed some misspellings in the help information.
 	Modified the pretty-print format of scalars.
 	Added some new comments to the source code.
-	Modified the sorts of references that you can cd into.
-	(Now can only cd into a REF, ARRAY, HASH or a blessed ref.)
 	Various other small updates.
 
 =head1 AUTHOR
@@ -220,15 +234,21 @@ A copyright statment is contained within the source code itself.
 #
 %Config = (
 
-	rootname        =>  '/' ,  # Any string
-	refname         => 'ref',  # Any string
+	rootname        =>  '/' ,    # Any string
+	refname         => 'ref',    # Any string
+	scalarname      => 'scalar', # Any string
+	undefname       => 'undef',  # Any string
+
 	maxdepth        =>   1  ,  # Any integer
 	indent          =>   1  ,  # 1,2 or 3
-	lscolwidth      =>  30  ,  # Any integer 
+	lscol1width     =>  13  ,  # Any integer 
+	lscol2width     =>  25  ,  # Any integer 
 
 	showrecursion   =>   1  ,  # Boolean
+	showids         =>   0  ,  # Boolean
 	skipdoublerefs  =>   1  ,  # Boolean
-	truncatescalars =>   0  ,  # Boolean
+	skipwarning     =>   1  ,  # Boolean
+	truncatescalars =>  35  ,  # Boolean
 
 	promptchar      =>  '>' ,  # Any string
 	arrowhead       =>  '>' ,  # Any string
@@ -265,29 +285,29 @@ sub new {
 }
 
 #---------------------------------------------------------------------------
-# Determine whether a reference is blessed.
+# Find out what a reference actually points to
 #
-sub isBlessed ($) {
+sub reftype {
 
-	my $ref = shift;
+	my ($ref) = @_;
 
-	# If it's a ref, but it's not a ref to any of these types,
-	# then it must be a blessed hash. 
+	return unless ref($ref);
+
+	my($realpack, $realtype, $id) =
+		(overload::StrVal($ref) =~ /^(?:(.*)\=)?([^=]*)\(([^\(]*)\)$/);
+
+	# For some reason, stringified version of a ref-to-ref gives a
+	# type of "SCALAR" rather than "REF".  Go figure.
 	#
-	if ( 
-		ref $ref
-		and
-		(ref $ref) !~ m/(GLOB|HASH|SCALAR|ARRAY|CODE|REF)/ 
-	) {
-		return 1;
-	} else {
-		return 0;
-	}
+	$realtype = 'REF' if $realtype eq 'SCALAR' and ref($$ref);
+
+	wantarray ? return ($realtype,$realpack,$id) : return $realtype;
 }
+
 
 #---------------------------------------------------------------------------
 # Print out a short string describing the type of thing
-# this reference is pointing to.  
+# this reference is pointing to.   Follow ref-to-refs if necessary.
 #
 sub printref {
 
@@ -295,15 +315,22 @@ sub printref {
 
 	$recurse = {} unless defined $recurse;
 
+	my ($type, $value) = ("error: type is empty","error: value is empty");
+
 	if (not defined $ref) {
 
-		return "undef";
+		$type  = $self->{scalarname};
+		$value = $self->{undefname};
 
 	} elsif (ref $ref) {
 
-		my $type = "";
+		my ($reftype,$refpackage,$id) = reftype($ref);
 
-		if (ref $ref eq "REF") {                                
+		$type = $reftype;
+		$type = $refpackage . "=" . $type if defined($refpackage) and $refpackage ne "";
+		$type .= "($id)" if $self->{showids};
+
+		if ($reftype eq "REF") {                                
 
 			# If this is a ref-to-ref, then recurse until we find 
 			# what it ultimately points to.  
@@ -314,58 +341,70 @@ sub printref {
 			if (exists $recurse->{$ref}) {
 
 				my $hops = (scalar keys %$recurse) - $recurse->{$ref};
-				$type = " (recurses in $hops " . ($hops > 1 ? "hops" : "hop") . ")";
+				$value = "(recurses in $hops " . ($hops > 1 ? "hops" : "hop") . ")";
 
 			} else {
 
 				$recurse->{$ref} = scalar keys(%$recurse);	
-				$type = $self->{arrow} . $self->printref($$ref,$recurse);
+				my ($nexttype, $nextvalue, $nextid) = $self->printref($$ref,$recurse);
+
+				$type  .= $self->{arrow} . $nexttype;
+				$type .= "($id)" if $self->{showids};
+				$value = $nextvalue;
 			}
 
 		} else {
 
 			$recurse = {};
 
-			if (ref $ref eq "HASH") {                           
+			if ($reftype eq "HASH") {                           
 
-				$type = " (" . scalar keys(%$ref) . ")";
+				$value = "(" . scalar keys(%$ref) . ")";
 
-			} elsif (ref $ref eq "ARRAY") {                          
+			} elsif ($reftype eq "ARRAY") {                          
 
-				$type = " (" . scalar @$ref . ")";
+				$value = "(" . scalar @$ref . ")";
 
-			} elsif (ref $ref eq "SCALAR" and not defined($$ref) ) { 
+			} elsif ($reftype eq "SCALAR" and not defined($$ref) ) { 
 
-				$type = " (undef)";
+				$value = $self->{undefname};
 
-			} elsif (ref $ref eq "SCALAR" and     defined $$ref  ) { 
+			} elsif ($reftype eq "SCALAR" and     defined $$ref  ) { 
 
-				$type = ": " . $self->printref($$ref,1);
+				$value = $$ref;
 
-			} elsif (isBlessed $ref) {                               
+			} else { 
 
-				$type = " (" . scalar keys(%$ref) . ")";
+				$value = "";   # We decline to displey other data types.  :)
 
-			} #End if (ref $ref eq ...) 
+			} #End if ($reftype eq ...) 
 
-		} #End if (ref $ref eq "REF") 
+		} #End if ($reftype eq "REF") 
 
-		return (ref $ref) . $type;
 
 	} else {
 
-		# It's not a refernce, so it must actually be a scalar. 
+		# It's not a reference, so it must actually be a scalar. 
 		#
-		my $retval = $ref;
+		$type  = $self->{scalarname};
+		$value = $ref;
 
-		if ($self->{truncatescalars} > 0 and length($ref) > $self->{truncatescalars}) {
+		if ($self->{truncatescalars} > 0 and length($ref) > $self->{truncatescalars} - 2) {
 
-			$retval = substr($ref,0,$self->{truncatescalars}) . "..." ;
+			$value = substr($ref,0,$self->{truncatescalars} - 5) . "..." ;
 		}
 
-		return $retval;
+		# Quote anything that's not a safe decimal number
+		#
+		unless ($value =~ /^-?[1-9]\d{0,8}$/) {
+
+			$value = '\'' . $value . '\'';
+		}
 
 	} #End if (not defined $ref) -- elsif (ref $ref) 
+
+
+	wantarray ? return ($type,$value) : return $type;
 
 } #End sub printref 
 
@@ -378,18 +417,16 @@ sub down {
 	my ($self,$namepath,$name,$refpath,$ref,$recurse) = @_;
 	$recurse = {} unless defined $recurse;
 
-	my $reftype = ref($ref) ? ref($ref) . " reference" : "scalar";
+	my $what_is_it = ref($ref) ? reftype($ref) .  " reference" : "scalar";
 
-	unless ($reftype =~ /(ARRAY|HASH|REF)/ or isBlessed($ref) ) {
+	unless ($what_is_it =~ /(ARRAY|HASH|REF)/) {
 
-		warn "'$name' is a $reftype, can't cd into it.\n";
-		return $refpath->[-1];
+		warn "'$name' is a $what_is_it, can't cd into it.\n";
+		return;
 	}
 
-	if (ref $refpath->[-1] eq "HASH" or isBlessed $refpath->[-1]) {
-		$name =  "{$name}";
-	}
-	$name = "[$name]" if ref $refpath->[-1] eq "ARRAY";
+	$name = "{$name}" if reftype($refpath->[-1]) eq "HASH";
+	$name = "[$name]" if reftype($refpath->[-1]) eq "ARRAY";
 
 	push @$namepath, $name;
 	push @$refpath, $ref;
@@ -405,10 +442,12 @@ sub down {
 	# Keep track of already-seen references in %$recurse.
 	# Pass $recurse to this function, recursively. 
 	#
-	if ($self->{skipdoublerefs} and ref $ref eq "REF") {
+	if ($self->{skipdoublerefs} and ref($ref) eq "REF") {
 
 		# Remember that we have seen the current reference.
 		$recurse->{$ref} = scalar keys(%$recurse);	
+
+		warn "Skipping down ref-to-ref.\n" if $self->{skipwarning};
 
 		if (exists $recurse->{$$ref}) {
 
@@ -430,7 +469,6 @@ sub down {
 
 		} else {
 
-			warn "Skipping down ref-to-ref.\n";
 			$ref = $self->down($namepath,$self->{refname},$refpath,$$ref,$recurse);
 
 			#------------------------------
@@ -443,14 +481,14 @@ sub down {
 			# for each *successful* call to the down() method, 
 			# which is what we want.  We back out just like we backed in.
 			#
-			if (ref $ref eq "REF" and scalar @$refpath > 1) {
-				warn "Skipping up ref-to-ref.\n";
+			if (ref($ref) eq 'REF' and scalar @$refpath > 1) {
+				warn "Skipping up ref-to-ref.\n" if $self->{skipwarning};
 				$ref = $self->up($namepath,$refpath);
 			}
 
 		} #End if (exists $recurse->{$$ref}) 
 
-	} #End if ($self->{skipdoublerefs} and ref $ref eq "REF") 
+	} #End if ($self->{skipdoublerefs} and ref($ref) eq "REF") 
 
 	# If 'skipdoublerefs' is not set, then we will be able to cd into
 	# ref-to-refs and run ls from within them.
@@ -471,12 +509,12 @@ sub up {
 	my $name = pop @$namepath;
 	           pop @$refpath;
 
-	# We don't need to watch out for recursion here, because
-	# we can only go back out the way we came.  
+	# We don't need to watch out for recursion here, 
+	# because we can only go back out the way we came.  
 	#
 	if ($self->{skipdoublerefs} and $name eq $self->{refname} and $#{ $refpath } > 0) {
 
-		warn "Skipping up ref-to-ref.\n";
+		warn "Skipping up ref-to-ref.\n" if $self->{skipwarning};
 		$self->up($namepath,$refpath);
 	}
 	my $ref = $refpath->[-1];
@@ -521,16 +559,20 @@ sub validate_config {
 
 	for ($key) {
 
-		/(truncatescalars|lscolwidth|maxdepth)/i
+		/(truncatescalars|lscol?width|maxdepth)/i
 			and do { 
 				my $key = $1;
-				unless ($value =~ /\d+/ and $value >= 0) { $msg = lc($key) . " must be a positive integer"; last; }
+				unless ($value =~ /\d+/ and $value >= 0) { 
+					$msg = lc($key) . " must be a positive integer"; last; 
+				}
 				$self->{lc $key} = $value; 
 				last; 
 			};
 		/indent/i
 			and do { 
-				unless ($value =~ /(1|2|3)/) { $msg = "indent must be a either 1, 2 or 3"; last; }
+				unless ($value =~ /(1|2|3)/) { 
+					$msg = "indent must be a either 1, 2 or 3"; last; 
+				}
 				$self->{indent} = $value; 
 				last; 
 			};
@@ -551,7 +593,7 @@ sub validate_config {
 		#
 		unless (exists $Config{$key}) {
 
-			$msg = "No such config variable as '" . lc($key) . "'\n";
+			$msg = "No such config variable as '" . lc($key) . "'";
 			return $msg;
 		}
 
@@ -616,7 +658,9 @@ sub walk {
 
 		chomp;
 		next COMMAND unless /\S/;               # Ignore empty commands
-		return if m/^(q|qu|quit|ex|exit)$/i;    # 50 ways to leave your session
+		return if m/^\s*(q|qu|quit|ex|exit)\s*$/i;    # 50 ways to leave your CLI
+
+		my ($reftype,$refpackage) = reftype($ref);
 
 		#------------------------------------------------------------
 		# Things we'd like to do, but don't do yet
@@ -649,7 +693,7 @@ sub walk {
 		#------------------------------------------------------------
 		# Small help utility, continued
 		#
-		} elsif (/^\s*(help set|help show)\s*$/) {
+		} elsif (/^\s*help\s+(set|show)\s*$/) {
 
 			print "The following items can be configured:\n";
 
@@ -723,6 +767,11 @@ sub walk {
 
 			foreach (@dirs) {
 
+				# The actual value of $ref may be modified within this loop,
+				# so we have to re-check it each time through
+				#
+				my ($reftype,$refpackage) = reftype($ref);
+
 				my $dir = $_;
 
 				if ($dir eq '.') {
@@ -733,7 +782,15 @@ sub walk {
 
 					$ref = $self->up(\@namepath,\@refpath);
 
-				} elsif (ref $ref eq "HASH" or isBlessed $ref) {
+				} elsif ($reftype eq "REF") {
+
+					unless ($dirspec eq $self->{refname}) {
+						print "'$dirspec' does not exist.  Type 'cd $self->{refname}' to descend into reference.\n";
+						next COMMAND;
+					}
+					$ref = $self->down(\@namepath,$dir,\@refpath,$$ref);
+
+				} elsif ($reftype eq "HASH") {
 
 					unless (exists $ref->{$dir}) {
 
@@ -747,9 +804,9 @@ sub walk {
 						$ref = $self->down(\@namepath,$dir,\@refpath,$ref->{$dir});
 					}
 
-				} elsif (ref $ref eq "ARRAY") {
+				} elsif ($reftype eq "ARRAY") {
 
-					unless ($dir =~ /^\d+$/ and defined $ref->[$dir]) {
+					unless ($dir =~ /^\d+$/ and scalar(@$ref) > $dir) {
 
 						print "No such element as '$leading_slash$dirspec'.\n";
 						@refpath  = @tmp_refpath;
@@ -761,35 +818,44 @@ sub walk {
 						$ref = $self->down(\@namepath,$dir,\@refpath,$ref->[$dir]);
 					}
 
-				} elsif (ref $ref eq "REF") {
-
-					unless ($dirspec eq $self->{refname}) {
-						print "'$dirspec' does not exist.  Type 'cd $self->{refname}' to descend into reference.\n";
-						next COMMAND;
-					}
-					$ref = $self->down(\@namepath,$dir,\@refpath,$$ref);
-
 				} else {
 
 					#------------------------------
-					# If $ref points to a SCALAR, CODE or something else then the
+					# If $ref points to a SCALAR, CODE or something else, then the
 					# 'cd' command is ignored within it.  We should never have chdir'ed
 					# there in the first place, so this message will only be printed
 					# if the author of this module has made an error.  ;) 
 					#
-					print "Don't know how to chdir from current directory (" . ref($ref) . 
+					print "Don't know how to chdir from current directory (" . $reftype . 
 						") into '$dirspec'.\n";
 
 					# Set our current location in the structure back to what it was.
 					# It may have been modified by the code which handles paths from the root.
+					# Don't even bother to parse the rest of the path, 
+					# just prompt for the next command.
 					#
 					@refpath  = @tmp_refpath;
 					@namepath = @tmp_namepath;
+					$ref = $refpath[-1];
 					next COMMAND;
 
 				} #End if ($dir eq ...
 
+				#------------------------------
+				# If the calls to down() or up() have failed for some reason,
+				# then return to wherever were to begin with. 
+				# Don't even bother to parse the rest of the path.
+				#
+				if (not defined $ref) {
+
+					@refpath  = @tmp_refpath;
+					@namepath = @tmp_namepath;
+					$ref = $refpath[-1];
+					next COMMAND;
+				}
+
 			} #End foreach (@dirs) 
+
 
 			# Looks like we successfully chdir'd from one place into another.
 			# Save our previous location in the structure into the "prev_" variables.
@@ -803,41 +869,58 @@ sub walk {
 		#------------------------------------------------------------
 		# Emulate ls -l
 		#
-		} elsif (/^\s*(ll|ls\s+-l|ls\s+-al|ls\s+-la|ls\s+-l|dir)\s*$/) {
+		} elsif (/^\s*(ll|ll -a|ls\s+-l|ls\s+-al|ls\s+-la|ls\s+-l|dir)\s*$/) {
 
 			my $dots = "";
+			my $format = "%-$self->{lscol1width}s\t%-$self->{lscol2width}s %s\n";
 
 			if (/a|dir/) {
-				$dots .= sprintf "%-$self->{lscolwidth}s\t%s\n", '..', $self->printref($refpath[-2]), if (scalar @namepath >  1);
-				$dots .= sprintf "%-$self->{lscolwidth}s\t%s\n", '..', $self->printref($refpath[-1]), if (scalar @namepath <= 1);
-				$dots .= sprintf "%-$self->{lscolwidth}s\t%s\n", '.',  $self->printref($refpath[-1]), ;
+
+				my ($type,$value);
+
+				if (scalar @namepath >  1) {
+
+					($type,$value) = $self->printref($refpath[-2]);
+					$dots = sprintf( $format, '..', $type, $value );
+					($type,$value) = $self->printref($refpath[-1]);
+
+				} else {
+
+					($type,$value) = $self->printref($refpath[-1]);
+					$dots = sprintf( $format, '..', $type, $value );
+				}
+
+				$dots .= sprintf( $format , '.', $type, $value );
 			}
 
-			if (ref $ref eq "HASH" or isBlessed $ref) {
+			if ($reftype eq "REF") {
+
+				print $dots;
+				my ($type,$value) = $self->printref($$ref);
+				printf( $format, $self->{refname}, $type, $value );
+
+			} elsif ($reftype eq "HASH") {
 
 				print $dots;
 				foreach (sort keys %$ref) {
 
-					printf "%-$self->{lscolwidth}s\t%s\n",$_,$self->printref($ref->{$_});
+					my ($type,$value) = $self->printref($ref->{$_});
+					printf( $format, $_, $type, $value );
 				}
 
-			} elsif (ref $ref eq "ARRAY") {
+			} elsif ($reftype eq "ARRAY") {
 
 				print $dots;
 				my $i = 0;
 				foreach (@$ref) {
 
-					printf "%-$self->{lscolwidth}s\t%s\n", $i++, $self->printref($_);
+					my ($type,$value) = $self->printref($_);
+					printf( $format, $i++, $type, $value );
 				}
-
-			} elsif (ref $ref eq "REF") {
-
-				print $dots;
-				printf "%-$self->{lscolwidth}s\t%s\n", $self->{refname}, $self->printref($$ref);
 
 			} else {
 
-				print "Current ref is a ref to " . ref($ref) . 
+				print "Current ref is a ref to " . $reftype . 
 					", don't know how to emulate ls -l in it.\n";
 			}
 			
@@ -848,7 +931,11 @@ sub walk {
 
 			my $dots = /a/ ? "..\t.\t" : "";
 
-			if (ref $ref eq "HASH" or isBlessed $ref) {
+			if ($reftype eq "REF") {
+
+				print $dots,$self->{refname},"\n";
+
+			} elsif ($reftype eq "HASH") {
 
 				print $dots;
 				foreach (sort keys %$ref) {
@@ -857,7 +944,7 @@ sub walk {
 				}
 				print "\n";
 
-			} elsif (ref $ref eq "ARRAY") {
+			} elsif ($reftype eq "ARRAY") {
 
 				print $dots;
 				my $i = 0;
@@ -866,14 +953,9 @@ sub walk {
 					print $self->printref($_), "\t";
 				}
 
-			} elsif (ref $ref eq "REF") {
-
-				print $dots,$self->{refname},"\n";
-
 			} else {
 
-				print "Current ref is a " . ref($ref) . 
-					", don't know how to emulate ls in it.\n";
+				print "Current ref is a $reftype, don't know how to emulate ls in it.\n";
 			}
 
 
@@ -896,17 +978,17 @@ sub walk {
 				print ${$refpath[-2]} if (scalar @namepath >  1);
 				print ${$refpath[-1]} if (scalar @namepath <= 1);
 
-			} elsif (ref $ref eq "HASH" or isBlessed $ref) {
+			} elsif ($reftype eq "HASH") {
 
 				print $ref->{$target};
 
-			} elsif (ref $ref eq "ARRAY") {
+			} elsif ($reftype eq "ARRAY") {
 
 				print $ref->[$target];
 
 			} else {
 
-				print "Don't know how to print '$target'.";
+				print "Current ref is a $reftype, don't know how to print from it.";
 			}
 			print "\n";
 
@@ -932,22 +1014,21 @@ sub walk {
 				print Data::Dumper->Dump([ $refpath[-2] ],[ $namepath[-2] ]) if (scalar @namepath >  1);
 				print Data::Dumper->Dump([ $refpath[-1] ],[ $namepath[-1] ]) if (scalar @namepath <= 1);
 
-			} elsif (ref $ref eq "HASH" or isBlessed $ref) {
-
-				print Data::Dumper->Dump( [ $ref->{$target} ], [ $target ] );
-
-			} elsif (ref $ref eq "ARRAY") {
-
-				print Data::Dumper->Dump( [ $ref->[$target] ], [ $target ] );
-
-			} elsif (ref $ref eq "REF") {
+			} elsif ($reftype eq "REF") {
 
 				print Data::Dumper->Dump( [ $$ref ], [ $target ] );
 
+			} elsif ($reftype eq "HASH") {
+
+				print Data::Dumper->Dump( [ $ref->{$target} ], [ $target ] );
+
+			} elsif ($reftype eq "ARRAY") {
+
+				print Data::Dumper->Dump( [ $ref->[$target] ], [ $target ] );
+
 			} else {
 
-				print "Don't know how to dump '$target'.";
-				next COMMAND;
+				print "Current ref is a $reftype, don't know how to dump things from it.";
 			}
 
 		#------------------------------------------------------------
@@ -1016,6 +1097,10 @@ sub walk {
 
 	} continue {
 
+		#------------------------------
+		# At the end of each loop, we might be inside a new directory.  
+		# Figure out what the prompt should look like. 
+		#
 		my @temp_namepath = @namepath;
 		my (%seen,%seen_twice);
 		my $count = 1;
@@ -1037,8 +1122,10 @@ sub walk {
 
 		printf "%s$self->{promptchar} ",join $self->{arrow},@temp_namepath;
 
+
 	} #End COMMAND: while(<>) {
 
-} #End sub peek
+
+} #End sub walk
 
 1;
