@@ -87,7 +87,7 @@ $WANT = 'REF->Data::Walker=HASH';
                               TEST q( $WALKER->printref(\$s      ) );
 
 $WALKER->showids(1);
-my $id = '\(0x.{6}\)';  # Regex to match the id of stringified refs
+my $id = '\(0x.+\)';  # Regex to match the id of stringified refs
 
 # 11-16  - Test formatting with ids
 #

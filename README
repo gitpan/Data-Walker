@@ -166,10 +166,12 @@ USAGE
     include better documentation and tests.
 
 CHANGES
-    Version 0.13
+    Version 0.13-0.14
 
             Added some installation tests.
-            Numerous internal changes; one or two bug fixes.
+            Numerous internal changes: 
+               moving functionality from the CLI-loop 
+               into distinct functions. 
 
     Version 0.12
 
