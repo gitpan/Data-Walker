@@ -2,7 +2,7 @@
 
 package Data::Walker;
 
-# Copyright (c) 1999 John Nolan. All rights reserved.
+# Copyright (c) 1999,2000 John Nolan. All rights reserved.
 # This program is free software.  You may modify and/or
 # distribute it under the same terms as Perl itself.
 # This copyright notice must remain attached to the file.
@@ -32,7 +32,7 @@ push @Commands, qw/chdir/;    # chdir is not exported
 
 use strict;
 
-$VERSION = '0.20';
+$VERSION = '1.01';
 sub Version { $VERSION };
 
 
@@ -82,7 +82,7 @@ so that you can hop into and out of a CLI without losing state,
 and you can have several Data::Walker objects pointing at 
 different structures. 
 
-The main functions can also be exported and used directly 
+The main functions can also be imported and used directly 
 from within the Perl debugger's CLI.  
 
 =head1 INSTALLATION
@@ -371,15 +371,27 @@ For each session (or object) the following items can be configured:
 	curname         (default:  'cur'  )  how to refer to the cursor for evals
 	parname         (default:  'par'  )  how to refer to the parent ref for evals
 
-This is an alpha release of this module.  
 
 =head1 CHANGES
 
-Version 0.19-0.20
+=over 4
 
-   Added new tests and updated the documentation.
+=item * Version 1.01
 
-Version 0.18
+	Minor changes to the documentation.
+	Added walker_http.pl, which is a library for using 
+	Data::Walker together with HTTP::Daemon to view objects 
+	with a Web browser.  Two example scripts are also included. 
+
+=item * Version 0.21
+
+	Minor changes to the documentation
+
+=item * Version 0.19-0.20
+
+	Added new tests and updated the documentation.
+
+=item * Version 0.18
 
 	Completely separated the CLI loop, command-parsing regexes, 
 	and the functions which implement the commands.  AUTOLOAD is now
@@ -390,7 +402,7 @@ Version 0.18
 	into the current package, so that you can easily invoke them 
 	from the perl debugger.
 
-Version 0.16-0.17
+=item * Version 0.16-0.17
 
 	The Data::Walker objects are now fully encapsulated. 
 
@@ -398,17 +410,17 @@ Version 0.16-0.17
 	namely walk() and cli(). The usage instructions have changed.  
 	Please have a look.
 
-Version 0.15
+=item * Version 0.15
 
 	Reorganized the installation tests.  
 	A few minor changes to the module itself.
 
-Version 0.13-0.14
+=item * Version 0.13-0.14
 
 	Moved some functionality from the CLI-loop
 	into distinct functions.
-                  
-Version 0.12
+
+=item * Version 0.12
 
 	Blessed references to non-hashes are now handled correctly.
 	Modified the output of "ls" commands (looks different).
@@ -417,21 +429,30 @@ Version 0.12
 	   skipwarning
 	Numerous internal changes.
 
-Version 0.11
+=item * Version 0.11
 
 	Fixed some misspellings in the help information.
 	Modified the pretty-print format of scalars.
 	Added some new comments to the source code.
 	Various other small updates.
 
+=back
+
 =head1 THANKS
+
+Thanks to Gurusamy Sarathy for writing Data::Dumper,
+and to Dominique Dumont for writing Tk::ObjScanner.
 
 Thanks to Matthew Persico for sending some ideas on 
 how this module might be useful in the debugger. 
 
+Thanks to Scott Lindsey for pointing out that this module
+is useful for reading files created with the Storable module,
+and for sending a sample script to do this. 
+
 =head1 AUTHOR
 
-John Nolan  jpnolan@sonic.net  August, 1999 - January 2000.
+John Nolan  jpnolan@sonic.net  1999,2000.
 A copyright statment is contained within the source code itself. 
 
 =cut                  
@@ -683,6 +704,11 @@ sub printref {
 sub down {
 
 	my ($self,$name,$ref,$recurse) = @_;
+
+	# The hash $recurse contains elements only when
+	# this function is called recursively.  This typically
+	# happens when we are chdir'ing down ref-to-refs.
+	#
 	$recurse = {} unless defined $recurse;
 
 	my $what_is_it = ref($ref) ? reftype($ref) .  " reference" : "scalar";
@@ -752,8 +778,8 @@ sub down {
 			# until the current ref is no longer a ref-to-ref.
 			#
 			# The following lines of code will be executed one time 
-			# for each *successful* call to the down() method, 
-			# which is what we want.  We back out just like we backed in.
+			# for each *successful* previous call to the down() method, 
+			# which is what we want.  We back out just like we came in.
 			#
 			if (ref($self->{cursor}) eq 'REF' and scalar @{$self->{refpath}} > 1) {
 
