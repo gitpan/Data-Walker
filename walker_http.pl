@@ -28,16 +28,20 @@ sub walk_via_HTTP_daemon {
 	$timeout   = 180 unless defined $timeout;
 	$port      =   0 unless defined $port;
 
-	
-	my $d = new HTTP::Daemon (LocalAddr => $host);
-	$d    = new HTTP::Daemon (LocalAddr => $port, LocalPort => $port) if $port;
+	my $d;
+
+	if ($port) {
+		$d = new HTTP::Daemon (LocalAddr => $host);
+	} else {
+		$d = new HTTP::Daemon (LocalAddr => $port, LocalPort => $port);
+	}
 	
 	unless (defined $d) {
 		warn "Could not bind to port.  I'm going to have to exit.  Sorry.\n";
 		exit(-1);
 	}
 	
-	my $myurl       = $d->url;
+	my $myurl = $d->url;
 
 	#----------------------------------------------
 	# Daemonize:  fork, and then detatch from the local shell.

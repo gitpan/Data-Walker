@@ -32,7 +32,7 @@ push @Commands, qw/chdir/;    # chdir is not exported
 
 use strict;
 
-$VERSION = '1.01';
+$VERSION = '1.04';
 sub Version { $VERSION };
 
 
@@ -375,6 +375,10 @@ For each session (or object) the following items can be configured:
 =head1 CHANGES
 
 =over 4
+
+=item * Version 1.02-1.04
+
+	Minor changes to installer tests.
 
 =item * Version 1.01
 

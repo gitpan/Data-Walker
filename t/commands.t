@@ -27,7 +27,7 @@ sub test {
 	my $ret = eval $string;
 	$ret = 'undef' if not defined $ret;
 
-	if($ret =~ /^$want$/m) {
+	if("$ret" =~ /^$want$/m) {
 
 		print "ok $tcounter\n";
 

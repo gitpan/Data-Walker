@@ -1,5 +1,5 @@
 
-README file for Data::Walker 1.01 
+README file for Data::Walker 1.04 
 
 
 NAME
@@ -320,6 +320,9 @@ USAGE
             parname         (default:  'par'  )  how to refer to the parent ref for evals
 
 CHANGES
+    * Version 1.02-1.03
+                Minor changes to installer tests.
+
     * Version 1.01
                 Minor changes to the documentation.
                 Added walker_http.pl, which is a library for using 
