@@ -20,7 +20,7 @@ use strict;
 use vars qw( $VERSION @ISA $AUTOLOAD );
 use vars qw( %Config );
 
-$VERSION = '0.15';
+$VERSION = '0.17';
 sub Version { $VERSION };
 
 ####################################################################
@@ -63,29 +63,39 @@ write access to a Perl lib directory.
 
 =head1 USAGE
 
-You open a command-line interface by invoking the walk function. 
+You open a command-line interface by invoking the cli() function. 
 
 	use Data::Walker;
-	Data::Walker->walk( $data_structure );
+	Data::Walker->cli( $data_structure );
+
+	use Data::Walker;
+	Data::Walker->cli( $data_structure );
 
 You can customize certain features, like so:
 
 	use Data::Walker;
 	$Data::Walker::Config{'skipdoublerefs'} = 0;
-	Data::Walker->walk( $data_structure );
+	Data::Walker->cli( $data_structure );
 
 If you prefer to use object-style notation, then you 
-can use this syntax to customize the settings:
+can use this syntax to customize the settings.
+You can invoke the walk() method directly, our you
+can let the cli() method call walk() implicitly: 
 
 	use Data::Walker;
 	my $w1 = new Data::Walker;
 	$w1->walk( $data_structure );
+	$w1->cli;
 
-	my $w2 = new Data::Walker( 'skipdoublerefs' => 0 );
-	$w2->walk( $data_structure );
+	my $w2 = new Data::Walker;
+	$w2->cli( $data_structure );
+
+	my $w3 = new Data::Walker( 'skipdoublerefs' => 0 );
+	$w3->walk( $data_structure );
+	$w3->cli();
 	
-	$w2->showrecursion(0);
-	$w2->walk( $data_structure );
+	$w3->showrecursion(0);
+	$w3->cli();
 
 Imagine a data structure like so:  
 
@@ -203,6 +213,22 @@ This is an alpha release of this module.
 
 =head1 CHANGES
 
+Version 0.16-0.17
+
+	The module is now fully object oriented. 
+	This will make it easier to use the module
+	outside of the CLI.
+
+	In the next version, I will completely separate out 
+	the CLI loop, command-parsing regexes, and the functions which 
+	implement the commands.  After that, AUTOLOAD can be set up to parse 
+	any commands that the CLI can parse.  This will make it 
+	more convenient to use the module from the perl debugger. 
+
+	NOTE:  The walk() function has been separated into two functions, 
+	namely walk() and cli(). The usage instructions have changed.  
+	Please have a look.
+
 Version 0.15
 
 	Reorganized the installation tests.  
@@ -298,6 +324,38 @@ sub new {
 } #End sub new
 
 #---------------------------------------------------------------------------
+# Point a Data::Walker object at a given reference
+#
+sub walk {
+
+
+	my ($self,$ref) = @_;
+	my $class = __PACKAGE__;
+
+	unless (defined $self and ref($self) eq $class) {
+
+		carp "Function $class::walk() MUST be invoked as a method on a $class object";
+		warn "If you don't like objects, then use $class->cli() directly instead.\n";
+		return 0;
+	}
+
+	unless (defined $ref and ref $ref) {
+
+		carp "Parameter is either undefined or is not a reference";
+		return 0;
+	}
+
+	$self->{namepath} = [$self->{rootname}];
+	$self->{refpath}  = [$ref];
+	$self->{cursor}   = $ref;
+
+	$self->{prev_namepath} = [];
+	$self->{prev_refpath}  = [];
+	$self->{tmp_namepath}  = [];
+	$self->{tmp_refpath}   = [];
+}
+
+#---------------------------------------------------------------------------
 # Find out what a reference actually points to
 #
 sub reftype {
@@ -349,9 +407,7 @@ sub printref {
 
 			# If this is a ref-to-ref, then recurse until we find 
 			# what it ultimately points to.  
-			#
-			# Check to make sure that we are not in a reference loop.
-			# If so, don't recurse.
+			# But stop if we detect a reference loop.
 			#
 			if (exists $recurse->{$ref}) {
 
@@ -437,6 +493,7 @@ sub down {
 
 		warn "'$name' is a $what_is_it, can't cd into it.\n" 
 			if $self->{warning};
+		$self->{cursor} = undef;  # The caller must handle this
 		return;
 	}
 
@@ -445,6 +502,8 @@ sub down {
 
 	push @{$self->{namepath}}, $name;
 	push @{$self->{refpath}}, $ref;
+
+	$self->{cursor} = $ref;    
 
 	#------------------------------
 	# If the 'skipdoublerefs' config value is set,
@@ -457,35 +516,36 @@ sub down {
 	# Keep track of already-seen references in %$recurse.
 	# Pass $recurse to this function, recursively. 
 	#
-	if ($self->{skipdoublerefs} and ref($ref) eq "REF") {
+	if ($self->{skipdoublerefs} and ref($self->{cursor}) eq "REF") {
 
 		# Remember that we have seen the current reference.
-		$recurse->{$ref} = scalar keys(%$recurse);	
+		$recurse->{$self->{cursor}} = scalar keys(%$recurse);	
 
 		warn "Skipping down ref-to-ref.\n" if $self->{skipwarning} and $self->{warning};
 
-		if (exists $recurse->{$$ref}) {
+		if (exists $recurse->{ ${$self->{cursor}} }) {
 
 			#------------------------------
-			# At this point, $ref is the current reference, and $$ref is 
-			# the reference it points to.  But if $recurse->{$$ref} exists,
-			# then we must have seen it before.  This means we have detected a 
-			# reference loop!
+			# If $recurse->{ ${$self->{cursor}} } exists, then we must have seen it before.  
+			# This means we have detected a reference loop.
 			#
-			# The value of $recurse->{$ref} is the number of reference-hops 
-			# to the current reference, and the value of $recurse->{$$ref} 
-			# the number of hops to $$ref, which is a smaller number,
+			# The value of $recurse->{$self->{cursor}} is the number of reference-hops 
+			# to the current reference, and the value of $recurse->{ ${$self->{cursor}} } 
+			# the number of hops to ${$self->{cursor}}, which is a smaller number,
 			# because we saw it before, on a previous hop. 
 			#
 			# To get the size of the reference loop, get the number of hops between them,
 			# and add one hop (to count the final hop back to the beginning of the loop).
 			#
-			my $hops = 1 + $recurse->{$ref} - $recurse->{$$ref};
-			warn "Reference loop detected: $hops ". ($hops > 1 ? "hops" : "hop") . ".\n";
+			my $hops = 1 + $recurse->{$self->{cursor}} - $recurse->{ ${$self->{cursor}} };
+			warn 
+				"Reference loop detected: $hops ". ($hops > 1 ? "hops" : "hop") . ".\n"
+				if $self->{warning}
+			;
 
 		} else {
 
-			$ref = $self->down($self->{refname},$$ref,$recurse);
+			$self->down( $self->{refname}, ${$self->{cursor}}, $recurse );
 
 			#------------------------------
 			# The call to the down() method in the previous line will fail
@@ -497,19 +557,25 @@ sub down {
 			# for each *successful* call to the down() method, 
 			# which is what we want.  We back out just like we backed in.
 			#
-			if (ref($ref) eq 'REF' and scalar @{$self->{refpath}} > 1) {
-				warn "Skipping up ref-to-ref.\n" if $self->{skipwarning} and $self->{warning};
-				$ref = $self->up();
+			if (ref($self->{cursor}) eq 'REF' and scalar @{$self->{refpath}} > 1) {
+
+				warn "Skipping up ref-to-ref.\n" 
+					if $self->{skipwarning} and $self->{warning};
+				$self->up();
 			}
 
-		} #End if (exists $recurse->{$$ref}) 
+		} #End if (exists $recurse->{ ${$self->{cursor}} }) 
 
-	} #End if ($self->{skipdoublerefs} and ref($ref) eq "REF") 
+	} else {
 
-	# If 'skipdoublerefs' is not set, then we will be able to cd into
-	# ref-to-refs and run ls from within them.
+		# Intentionally empty
+		#
+		# If 'skipdoublerefs' is not set, then we will be able to cd into
+		# ref-to-refs and run ls from within them.
 
-	return $ref;
+	} #End if ($self->{skipdoublerefs} and ref($self->{cursor}) eq "REF") 
+
+	return $self->{cursor};
 
 } #End sub down
 
@@ -535,8 +601,9 @@ sub up {
 		warn "Skipping up ref-to-ref.\n" if $self->{skipwarning} and $self->{warning};
 		$self->up();
 	}
-	my $ref = $self->{refpath}[-1];
-	return $ref;
+	$self->{cursor} = $self->{refpath}[-1];
+
+	return $self->{cursor};
 
 } #End sub up
 
@@ -648,7 +715,7 @@ sub validate_config {
 #
 sub walker_chdir {
 
-	my ($self,$dirspec,$ref) = @_;
+	my ($self,$dirspec) = @_;
 
 	#------------------------------
 	# Handle cd -
@@ -657,9 +724,9 @@ sub walker_chdir {
 
 		# Swap swap, fizz fizz.....
 		#
-		   @{$self->{tmp_namepath}} =      @{$self->{namepath}};
-		       @{$self->{namepath}} = @{$self->{prev_namepath}};
-		  @{$self->{prev_namepath}} =  @{$self->{tmp_namepath}};
+		  @{$self->{tmp_namepath}} =      @{$self->{namepath}};
+		      @{$self->{namepath}} = @{$self->{prev_namepath}};
+		 @{$self->{prev_namepath}} =  @{$self->{tmp_namepath}};
 
 		    @{$self->{tmp_refpath}} =       @{$self->{refpath}};
 		        @{$self->{refpath}} =  @{$self->{prev_refpath}};
@@ -667,9 +734,9 @@ sub walker_chdir {
 
 		# Use the last ref in the (now) current refpath
 		#
-		$ref = $self->{refpath}[-1];
+		$self->{cursor} = $self->{refpath}[-1];
 
-		next COMMAND;
+		return $self->{cursor};
 
 	} else {
 
@@ -690,10 +757,10 @@ sub walker_chdir {
 
 		# Set the paths back to the beginning
 		$#{$self->{namepath}} = 0;
-		$#{$self->{refpath}} = 0;
+		$#{$self->{refpath}}  = 0;
 
 		# Set ref to the first item in the refpath
-		$ref = $self->{refpath}[0];
+		$self->{cursor} = $self->{refpath}[0];
 
 		# Strip any leading '/' chars from $dirspec
 		#
@@ -709,10 +776,10 @@ sub walker_chdir {
 
 	foreach (@dirs) {
 
-		# The actual value of $ref may be modified within this loop,
+		# The actual value of $self->{cursor} may be modified within this loop,
 		# so we have to re-check it each time through
 		#
-		my ($reftype,$refpackage) = reftype($ref);
+		my ($reftype,$refpackage) = reftype($self->{cursor});
 
 		my $dir = $_;
 
@@ -722,50 +789,55 @@ sub walker_chdir {
 
 		} elsif ($_ eq '..') {
 
-			$ref = $self->up();
+			$self->up();
 
 		} elsif ($reftype eq "REF") {
 
 			unless ($dirspec eq $self->{refname}) {
+
 				warn "'$dirspec' does not exist.  " .
 						"Type 'cd $self->{refname}' to descend into reference.\n"
 					if $self->{warning};
-				return $ref;
+
+				return $self->{cursor};
 			}
-			$ref = $self->down($dir,$$ref);
+
+			$self->down($dir, ${ $self->{cursor} });
 
 		} elsif ($reftype eq "HASH") {
 
-			unless (exists $ref->{$dir}) {
+			unless (exists $self->{cursor}->{$dir}) {
 
 				warn "No such element as '$leading_slash$dirspec'.\n" if $self->{warning};
 				@{$self->{refpath}}  = @{$self->{tmp_refpath}};
 				@{$self->{namepath}} = @{$self->{tmp_namepath}};
-				return $ref;
+
+				return $self->{cursor};
 
 			} else {
 
-				$ref = $self->down($dir,$ref->{$dir});
+				$self->down($dir,$self->{cursor}->{$dir});
 			}
 
 		} elsif ($reftype eq "ARRAY") {
 
-			unless ($dir =~ /^\d+$/ and scalar(@$ref) > $dir) {
+			unless ($dir =~ /^\d+$/ and scalar(@{ $self->{cursor} }) > $dir) {
 
 				warn "No such element as '$leading_slash$dirspec'.\n" if $self->{warning};
 				@{$self->{refpath}}  = @{$self->{tmp_refpath}};
 				@{$self->{namepath}} = @{$self->{tmp_namepath}};
-				return $ref;
+
+				return $self->{cursor};
 
 			} else {
 
-				$ref = $self->down($dir,$ref->[$dir]);
+				$self->down($dir,$self->{cursor}->[$dir]);
 			}
 
 		} else {
 
 			#------------------------------
-			# If $ref points to a SCALAR, CODE or something else, then the
+			# If $self->{cursor} points to a SCALAR, CODE or something else, then the
 			# 'cd' command is ignored within it.  We should never have chdir'ed
 			# there in the first place, so this message will only be printed
 			# if the author of this module has made an error.  ;) 
@@ -774,8 +846,7 @@ sub walker_chdir {
 				if $self->{warning};
 			@{$self->{refpath}}  = @{$self->{tmp_refpath}};
 			@{$self->{namepath}} = @{$self->{tmp_namepath}};
-			$ref = $self->{refpath}[-1];
-			return $ref;
+			$self->{cursor} = $self->{refpath}[-1];
 
 		} #End if ($dir eq ...
 
@@ -784,12 +855,13 @@ sub walker_chdir {
 		# then return to wherever were to begin with. 
 		# Don't even bother to parse the rest of the path.
 		#
-		if (not defined $ref) {
+		if (not defined $self->{cursor}) {
 
 			@{$self->{refpath}}  = @{$self->{tmp_refpath}};
 			@{$self->{namepath}} = @{$self->{tmp_namepath}};
-			$ref = $self->{refpath}[-1];
-			return $ref;
+			$self->{cursor} = $self->{refpath}[-1];
+
+			return $self->{cursor};
 		}
 
 	} #End foreach (@dirs) 
@@ -802,8 +874,6 @@ sub walker_chdir {
 	@{$self->{prev_refpath}}  = @{$self->{tmp_refpath}};
 	@{$self->{prev_namepath}} = @{$self->{tmp_namepath}};
 
-	return $ref;
-
 } #End sub walker_chdir
 
 
@@ -812,8 +882,10 @@ sub walker_chdir {
 #
 sub walker_ls {
 
-	my ($self,$ref,$option) = @_;
-	my ($reftype,$refpackage) = reftype($ref);
+	my ($self,$option) = @_;
+	my ($reftype,$refpackage) = reftype($self->{cursor});
+
+	my $out = "";
 
 	if ($option =~ /l/) {
 
@@ -827,13 +899,13 @@ sub walker_ls {
 			if (scalar @{$self->{namepath}} >  1) {
 	
 				($type,$value) = $self->printref($self->{refpath}[-2]);
-				$dots = sprintf( $format, '..', $type, $value );
+				$dots .= sprintf( $format, '..', $type, $value );
 				($type,$value) = $self->printref($self->{refpath}[-1]);
 
 			} else {
 
 				($type,$value) = $self->printref($self->{refpath}[-1]);
-				$dots = sprintf( $format, '..', $type, $value );
+				$dots .= sprintf( $format, '..', $type, $value );
 			}
 
 			$dots .= sprintf( $format , '.', $type, $value );
@@ -841,32 +913,32 @@ sub walker_ls {
 
 		if ($reftype eq "REF") {
 
-			print $dots;
-			my ($type,$value) = $self->printref($$ref);
-			printf( $format, $self->{refname}, $type, $value );
+			$out .= $dots;
+			my ($type,$value) = $self->printref(${ $self->{cursor} });
+			$out .= sprintf( $format, $self->{refname}, $type, $value );
 
 		} elsif ($reftype eq "HASH") {
 
-			print $dots;
-			foreach (sort keys %$ref) {
+			$out .= $dots;
+			foreach (sort keys %{$self->{cursor}}) {
 
-				my ($type,$value) = $self->printref($ref->{$_});
-				printf( $format, $_, $type, $value );
+				my ($type,$value) = $self->printref($self->{cursor}->{$_});
+				$out .= sprintf( $format, $_, $type, $value );
 			}
 
 		} elsif ($reftype eq "ARRAY") {
 
-			print $dots;
+			$out .= $dots;
 			my $i = 0;
-			foreach (@$ref) {
+			foreach (@{ $self->{cursor} }) {
 
 				my ($type,$value) = $self->printref($_);
-				printf( $format, $i++, $type, $value );
+				$out .= sprintf( $format, $i++, $type, $value );
 			} 
 
 		} else {
 
-	 		print "Current ref is a ref to " . $reftype . 
+	 		$out .= "Current ref is a ref to " . $reftype . 
 				", don't know how to emulate ls -l in it.\n";
 		}
 
@@ -876,33 +948,34 @@ sub walker_ls {
 
 		if ($reftype eq "REF") {
 
-			print $dots,$self->{refname},"\n";
+			$out .= $dots . $self->{refname} . "\n";
 
 		} elsif ($reftype eq "HASH") {
 
-			print $dots;
-			foreach (sort keys %$ref) {
+			$out .= $dots;
+			foreach (sort keys %{ $self->{cursor} }) {
 
-				print $_, "\t";
+				$out .= $_. "\t";
 			}
-			print "\n";
+			$out .= "\n";
 
 		} elsif ($reftype eq "ARRAY") {
 
-			print $dots;
+			$out .= $dots;
 			my $i = 0;
-			foreach (@$ref) {
+			foreach (@{ $self->{cursor} }) {
 
-				print $self->printref($_), "\t";
+				$out .= $self->printref($_). "\t";
 			}
 
 		} else {
 
-			print "Current ref is a $reftype, don't know how to emulate ls in it.\n";
+			$out .= "Current ref is a $reftype, don't know how to emulate ls in it.\n";
 		}
 
 	}
 
+	return $out;
 
 } #End sub walker_ls
 
@@ -912,38 +985,50 @@ sub walker_ls {
 #
 sub walker_cat {
 
-	my ($self,$ref,$target) = @_;
-	my ($reftype,$refpackage) = reftype($ref);
+	my ($self,$target) = @_;
+	my ($reftype,$refpackage) = reftype($self->{cursor});
 
+	my $out = "";
 
 	# Prints "print--> "...
-	print "print$self->{arrowshaft}$self->{arrow} '",$target,"'\n";
+	$out = "print$self->{arrowshaft}$self->{arrow} '" . $target . "'\n";
 			
 	if ($target eq ".") {
 
-		print $ref;
+		$out = $self->{cursor};
 
 	} elsif ($target eq '..') {
 
-		print ${$self->{refpath}[-2]} if (scalar @{$self->{namepath}} >  1);
-		print ${$self->{refpath}[-1]} if (scalar @{$self->{namepath}} <= 1);
+		$out = ${$self->{refpath}[-2]} if (scalar @{$self->{namepath}} >  1);
+		$out = ${$self->{refpath}[-1]} if (scalar @{$self->{namepath}} <= 1);
 
 	} elsif ($reftype eq "HASH") {
 
-		print $ref->{$target};
+		$out = $self->{cursor}->{$target};
 
 	} elsif ($reftype eq "ARRAY") {
 
-		print $ref->[$target];
+		$out = $self->{cursor}->[$target];
 
 	} else {
 
 		warn "Current ref is a $reftype, don't know how to print from it."
 			if $self->{warning};
 	}
-	print "\n";
+
+	return $out;
 
 } #End sub walker_cat
+
+
+#---------------------------------------------------------------------------
+# Print the current path
+#
+sub walker_pwd {
+
+	my $self = shift;
+	return join $self->{arrow},@{$self->{namepath}};
+}
 
 
 #---------------------------------------------------------------------------
@@ -951,8 +1036,8 @@ sub walker_cat {
 #
 sub walker_dump {
 
-	my ($self,$ref,$target) = @_;
-	my ($reftype,$refpackage) = reftype($ref);
+	my ($self,$target) = @_;
+	my ($reftype,$refpackage) = reftype($self->{cursor});
 
 	# Pass config values directly to Data::Dumper
 	#
@@ -964,7 +1049,7 @@ sub walker_dump {
 			
 	if ($target eq ".") {
 
-		print Data::Dumper->Dump( [ $ref ] );
+		print Data::Dumper->Dump( [ $self->{cursor} ] );
 
 	} elsif ($target eq '..') {
 
@@ -975,15 +1060,15 @@ sub walker_dump {
 
 	} elsif ($reftype eq "REF") {
 
-		print Data::Dumper->Dump( [ $$ref ], [ $target ] );
+		print Data::Dumper->Dump( [ ${$self->{cursor}} ], [ $target ] );
 
 	} elsif ($reftype eq "HASH") {
 
-		print Data::Dumper->Dump( [ $ref->{$target} ], [ $target ] );
+		print Data::Dumper->Dump( [ $self->{cursor}->{$target} ], [ $target ] );
 
 	} elsif ($reftype eq "ARRAY") {
 
-		print Data::Dumper->Dump( [ $ref->[$target] ], [ $target ] );
+		print Data::Dumper->Dump( [ $self->{cursor}->[$target] ], [ $target ] );
 
 	} else {
 
@@ -997,41 +1082,42 @@ sub walker_dump {
 #---------------------------------------------------------------------------
 # "Walk" a data structure.  This function implements the CLI.
 #
-sub walk {
+sub cli {
 
 	my $class = __PACKAGE__;
+	my ($self,$ref) = @_;;
 
-	# We expect exactly 2 parameters:  
-	# 1. the object or class; 
-	# 2. the target ref.
-	#
-	if (scalar @_ != 2) {
+	if (defined($_[0]) and $_[0] eq $class) {
 
-		carp "Usage:  ${class}->walk(\$ref) or \$p->(\$ref), where \$p is \n" .
-			"a $class object, and \$ref is the target data structure.\n";
+		# If cli() was invoked as a class method, then we
+		# create an object on the fly.  This object will 
+		# be destroyed as soon as $self goes out of scope, 
+		# at the end of this function.
+		#
+		$self = new($class);
+		$self->walk($ref) or return;
+
+	} elsif (ref($self) eq $class and defined($ref) and reftype($ref) eq "REF")  {
+
+		$self->walk($ref) or return;
+
+	} elsif (ref($self) eq $class and defined $self->{cursor})  {
+
+		# Intentionally empty, no need to invoke walk().
+		# Don't return. 
+
+	} else {
+
+		(my $msg =<<"			EOC") =~ s/^\t\t\t+//gsm;
+			Usage:
+			   ${class}->cli(\$ref) or 
+			   my \$w = new $class;  \$w->walk(\$ref);  \$w->cli();  or
+			   my \$w = new $class;  \$w->cli(\$ref);
+			where \$ref is the target data structure.
+			EOC
+		carp $msg;
 		return;
 	}
-
-	# The first parameter is either the name of the class or 
-	# a reference to the object on which this method was invoked.  
-	# If it's the name of the class, then create an object on the fly. 
-	#
-	my $self = ref($_[0]) eq $class ? $_[0] : new($class);
-	my $ref  = $_[1];
-
-	unless (defined $ref and ref $ref) {
-
-		carp "Parameter is either undefined or is not a reference";
-		return;
-	}
-
-	$self->{namepath} = [$self->{rootname}];
-	$self->{refpath}  = [$ref];
-
-	$self->{prev_namepath} = [];
-	$self->{prev_refpath}  = [];
-	$self->{tmp_namepath}  = [];
-	$self->{tmp_refpath}   = [];
 
 	printf "%s$self->{promptchar} ",join $self->{arrow},@{$self->{namepath}};
 
@@ -1043,16 +1129,15 @@ sub walk {
 
 		chomp;
 		next COMMAND unless /\S/;               # Ignore empty commands
+
 		return if m/^\s*(q|qu|quit|ex|exi|exti|exit)\s*$/i;    # 50 ways to leave your CLI
 
-##		my ($reftype,$refpackage) = reftype($ref);
-
 		#------------------------------------------------------------
-		# Things we'd like to do, but don't do yet
+		# Emulate the pwd command
 		#
 		if (/^(pwd)$/) {
 
-			print "Command '$_' is not yet implemented\n";
+			print $self->walker_pwd,"\n";
 
 		#------------------------------------------------------------
 		# Small help utility
@@ -1115,43 +1200,40 @@ sub walk {
 		#
 		} elsif (/^\s*(cd|chdir)\s+(.+)$/) {
 
-			$ref = $self->walker_chdir($2,$ref);
+			$self->walker_chdir($2);
 
 		#------------------------------------------------------------
 		# Emulate ls -l
 		#
 		} elsif (/^\s*(ll\s+-a|ls\s+-al|ls\s+-la|dir|ls\s+-a\s+-l|ls\s+-l\s+-a|la\s+-l)\s*$/) {
 
-			$self->walker_ls($ref,"la");
+			print $self->walker_ls("la");
 			
 		} elsif (/^\s*(ll|ls\s+-l|ls\s+-l)\s*$/) {
 
-			$self->walker_ls($ref,"l");
+			print $self->walker_ls("l");
 			
 		} elsif (/^\s*(ls\s+-a|la)\s*$/) {
 
-			$self->walker_ls($ref,"a");
+			print $self->walker_ls("a");
 
 		} elsif (/^\s*(l|ls)\s*$/) {
 
-			$self->walker_ls($ref,"");
+			print $self->walker_ls("");
 
 		#------------------------------------------------------------
 		# Emulate cat 
 		#
 		} elsif (/^\s*(cat|type|print|p)\s+(.+?)\s*$/) {
 
-			my $target = $2;
-			$self->walker_cat($ref,$target);
-
+			print $self->walker_cat($2),"\n";
 
 		#------------------------------------------------------------
 		# Invoke dump
 		#
 		} elsif (/^\s*(dump|d)\s+(.+?)\s*(\d*)$/) {
 
-			my $target = $2;
-			$self->walker_dump($ref,$target);
+			print $self->walker_dump($2);
 
 		#------------------------------------------------------------
 		# Adjust config settings ("set indent 2")
@@ -1271,7 +1353,7 @@ sub walk {
 	} #End COMMAND: while(<>) {
 
 
-} #End sub walk
+} #End sub cli
 
 1;
 

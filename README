@@ -27,29 +27,38 @@ INSTALLATION
     directory.
 
 USAGE
-    You open a command-line interface by invoking the walk function.
+    You open a command-line interface by invoking the cli() function.
 
             use Data::Walker;
-            Data::Walker->walk( $data_structure );
+            Data::Walker->cli( $data_structure );
+
+            use Data::Walker;
+            Data::Walker->cli( $data_structure );
 
     You can customize certain features, like so:
 
             use Data::Walker;
             $Data::Walker::Config{'skipdoublerefs'} = 0;
-            Data::Walker->walk( $data_structure );
+            Data::Walker->cli( $data_structure );
 
     If you prefer to use object-style notation, then you can use this syntax
-    to customize the settings:
+    to customize the settings. You can invoke the walk() method directly,
+    our you can let the cli() method call walk() implicitly:
 
             use Data::Walker;
             my $w1 = new Data::Walker;
             $w1->walk( $data_structure );
+            $w1->cli;
 
-            my $w2 = new Data::Walker( 'skipdoublerefs' => 0 );
-            $w2->walk( $data_structure );
+            my $w2 = new Data::Walker;
+            $w2->cli( $data_structure );
+
+            my $w3 = new Data::Walker( 'skipdoublerefs' => 0 );
+            $w3->walk( $data_structure );
+            $w3->cli();
             
-            $w2->showrecursion(0);
-            $w2->walk( $data_structure );
+            $w3->showrecursion(0);
+            $w3->cli();
 
     Imagine a data structure like so:
 
@@ -163,6 +172,22 @@ USAGE
     This is an alpha release of this module.
 
 CHANGES
+    Version 0.16-0.17
+
+            The module is now fully object oriented. 
+            This will make it easier to use the module
+            outside of the CLI.
+
+            In the next version, I will completely separate out 
+            the CLI loop, command-parsing regexes, and the functions which 
+            implement the commands.  After that, AUTOLOAD can be set up to parse 
+            any commands that the CLI can parse.  This will make it 
+            more convenient to use the module from the perl debugger. 
+
+            NOTE:  The walk() function has been separated into two functions, 
+            namely walk() and cli(). The usage instructions have changed.  
+            Please have a look.
+
     Version 0.15
 
             Reorganized the installation tests.  

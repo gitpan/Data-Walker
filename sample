@@ -24,5 +24,8 @@ $s->{b}->{v} =  $s->{b};   #recursive
 
 my $p = Data::Walker->new();
 $p->walk($s);
+$p->cli();
+
+# Data::Walker->cli($s);
 
 1;
