@@ -7,21 +7,34 @@ package Data::Walker;
 # distribute it under the same terms as Perl itself.
 # This copyright notice must remain attached to the file.
 #
-# You can run this file through either pod2man or pod2html
-# to produce pretty documentation in manual or html file format
-# (these utilities are part of the Perl 5 distribution).
+# You can run this file through either pod2text, pod2man or 
+# pod2html to produce pretty documentation in text, manpage or 
+# html file format (these utilities are part of the 
+# Perl 5 distribution).
 
-use Carp;
 use Data::Dumper;
 use overload;           # We will use overload::StrVal() 
 
+use vars qw( $VERSION @ISA $AUTOLOAD @EXPORT %EXPORT_TAGS );
+use vars qw( $WALKER %Config @Commands %Commands @ExportedCommands );
+
+require Exporter;
+@ISA = qw(Exporter);
+
+@Commands         = qw/ls ll la all lla lal cd pwd 
+                       print type cat dump show set walk cli/;
+@ExportedCommands = (@Commands, qw/unwalk/);
+
+@EXPORT_OK   = @ExportedCommands;
+%EXPORT_TAGS = ( direct => [ @ExportedCommands ] );
+
+push @Commands, qw/chdir/;    # chdir is not exported
+
 use strict;
 
-use vars qw( $VERSION @ISA $AUTOLOAD );
-use vars qw( %Config );
-
-$VERSION = '0.17';
+$VERSION = '0.18';
 sub Version { $VERSION };
+
 
 ####################################################################
 # ---{ B E G I N   P O D   D O C U M E N T A T I O N }--------------
@@ -33,21 +46,48 @@ B<Data::Walker> - A tool for navigating through Perl data structures
 
 =head1 SYNOPSIS
 
+Without any explicit objects:
+
   use Data::Walker;
-  Data::Walker->walk( $data_structure );
-  # see below for details
+  Data::Walker->cli( $data_structure );
+
+Object-style invocation:
+
+  use Data::Walker;
+  my $w = new Data::Walker;
+  $w->walk( $data_structure );
+  $w->ls("-al");
+  $w->pwd;
+  $w->cli;
+
+Importing methods into the current package:
+
+  use Data::Walker qw(:direct);
+  walk $data_structure;
+  ls "-al";
+  pwd;
+  cli;
 
 =head1 DESCRIPTION
 
-This module allows you to "walk" an arbitrary Perl data
-structure in the same way that you can walk a directory tree
-from the command line.   It is meant to be used interactively
-with a live user, as a command-line interface.
+This module allows you to "walk" an arbitrary Perl data 
+structure in the same way that you can walk a directory tree 
+from a UNIX command line.   It reuses familiar unix commands 
+(such as "ls", "cd", "pwd") and applies these to data structures. 
 
+It has a command-line interface which behaves like a UNIX shell.   
+You can also use object-style sytax to invoke the CLI commands from 
+outside the CLI.   Data::Walker objects are encapsulated, 
+so that you can hop into and out of a CLI without losing state, 
+and you can have several Data::Walker objects pointing at 
+different structures. 
+
+The main functions can also be exported and used directly 
+from within the Perl debugger's CLI.  
 
 =head1 INSTALLATION
 
-To install this package, just change to the directory which
+To install this package, just chdir into the directory which
 you created by untarring the package, and type the following:
 
 	perl Makefile.PL
@@ -64,9 +104,6 @@ write access to a Perl lib directory.
 =head1 USAGE
 
 You open a command-line interface by invoking the cli() function. 
-
-	use Data::Walker;
-	Data::Walker->cli( $data_structure );
 
 	use Data::Walker;
 	Data::Walker->cli( $data_structure );
@@ -96,6 +133,20 @@ can let the cli() method call walk() implicitly:
 	
 	$w3->showrecursion(0);
 	$w3->cli();
+
+You can also import most of the functions directly into 
+the current package.  This is especially useful from within 
+the debugger (see the example below).
+
+	use Data::Walker qw(:direct);
+	walk $data_structure;
+	ls "-al";
+	pwd;
+	cli;
+
+When you use the :direct pragma and invoke the walk() function,
+a Data::Walker object is implicitly created, and is available 
+as $Data::Walker::WALKER. 
 
 Imagine a data structure like so:  
 
@@ -156,10 +207,9 @@ Here is a sample interactive session examining this structure ('/>' is the promp
 	c               CODE                      
 	d               scalar                    80
 	e               SCALAR                    80
-	/> ! $ref->{d} += 3
-	eval--> $ref->{d} += 3
-	
-	83
+	/> ! $cur->{d} += 3
+	eval--> $cur->{d} += 3
+	retv--> 83
 	/> ls -al
 	..              HASH                      (5)
 	.               HASH                      (5)
@@ -170,7 +220,116 @@ Here is a sample interactive session examining this structure ('/>' is the promp
 	e               SCALAR                    83
 	/> 
 	
-	
+
+Below is a sample debugger session examining this structure.
+
+Note that the walk() function returns a reference to the "cursor",
+which is a reference to whatever is the "current directory,"
+so to speak.  The actual Data::Walker object iself is managed
+implicitly, and is available as $Data::Walker::WALKER. 
+When you are finished, you can undef this object directly, 
+or use the unwalk() function, which does this for you. 
+But if you saved a copy of the cursor, then you will need to 
+undef this on your own. 
+
+
+	(violet) ~/perl/walker/Data-Walker-0.18 > perl -d sample
+
+	Loading DB routines from perl5db.pl version 1.0401
+	Emacs support available.
+
+	Enter h or `h h' for help.
+
+	main::(sample:19):              d => 80,
+	  DB<1> n
+	main::(sample:22):      $s->{e}      = \$s->{d};
+	  DB<1> n
+	main::(sample:30):      1;
+	  DB<1> use Data::Walker qw(:direct)
+
+	  DB<2> $cur = walk $s
+
+	  DB<3> pwd
+	/
+	  DB<4> ls
+	a       b       c       d       e
+	  DB<5> lal
+	..              HASH                      (5)
+	.               HASH                      (5)
+	a               ARRAY                     (3)
+	b               HASH                      (4)
+	c               CODE
+	d               scalar                    80
+	e               SCALAR                    80
+	  DB<6> cd a
+	/->{a}        
+	  DB<7> ll
+	0               scalar                    10
+	1               scalar                    20
+	2               scalar                    'thirty'      
+	  DB<8> cd '../b'
+	/->{b}
+	  DB<9> lal
+	..              HASH                      (5)
+	.               HASH                      (4)
+	w               scalar                    'forty'
+	x               scalar                    'fifty'
+	y               scalar                    60
+	z               SCALAR                    70       
+	  DB<10> cd '..'
+	/
+	  DB<11> dump b
+	dump--> 'b'
+	$b = {
+	  'x' => 'fifty',
+	  'y' => 60,
+	  'z' => \70,
+	  'w' => 'forty'
+	};                  
+	  DB<12> ll
+	a               ARRAY                     (3)
+	b               HASH                      (4)
+	c               CODE
+	d               scalar                    80
+	e               SCALAR                    80
+	  DB<13> $cur->{d} += 3
+
+	  DB<14> ll
+	a               ARRAY                     (3)
+	b               HASH                      (4)
+	c               CODE
+	d               scalar                    83
+	e               SCALAR                    83
+	  DB<15>                   
+	  DB<16> pwd
+	/
+	  DB<17> cli
+	/> cd b
+	/->{b}> ls -l
+	w               scalar                    'forty'
+	x               scalar                    'fifty'
+	y               scalar                    60
+	z               SCALAR                    70     
+	/->{b}> print y
+	60
+	/->{b}> print x
+	fifty
+	/->{b}> exit
+
+	  DB<18> pwd
+	/->{b}
+	  DB<19> ll
+	w               scalar                    'forty'
+	x               scalar                    'fifty'
+	y               scalar                    60
+	z               SCALAR                    70
+	  DB<20> unwalk
+
+	  DB<21> undef $cur
+
+	  DB<22> 
+
+
 The following commands are available from within the CLI.
 With these commands, you can navigate around the data 
 structure as if it were a directory tree.
@@ -203,27 +362,33 @@ For each session (or object) the following items can be configured:
 	skipdoublerefs  (default:   1 )  hop over ref-to-refs during walks
 	skipwarning     (default:   1 )  warn when hopping over ref-to-refs
 	truncatescalars (default:  37 )  truncate scalars in 'ls' displays
+	autoprint       (default:   1 )  print CLI commands when not in CLI
 
 	promptchar      (default:  '>')  customize the session prompt
 	arrowshaft      (default:  '-')  ('-' in '->')
 	arrowhead       (default:  '>')  ('>' in '->')
 
+	curname         (default:  'cur'  )  how to refer to the cursor for evals
+	parname         (default:  'par'  )  how to refer to the parent ref for evals
 
 This is an alpha release of this module.  
 
 =head1 CHANGES
 
+Version 0.18
+
+	Completely separated the CLI loop, command-parsing regexes, 
+	and the functions which implement the commands.  AUTOLOAD is now
+	set up to handle any commands that the CLI can parse (except
+	for eval() ).  
+
+	By using the :direct pragma, you can now import AUTOLOADed functions 
+	into the current package, so that you can easily invoke them 
+	from the perl debugger.
+
 Version 0.16-0.17
 
-	The module is now fully object oriented. 
-	This will make it easier to use the module
-	outside of the CLI.
-
-	In the next version, I will completely separate out 
-	the CLI loop, command-parsing regexes, and the functions which 
-	implement the commands.  After that, AUTOLOAD can be set up to parse 
-	any commands that the CLI can parse.  This will make it 
-	more convenient to use the module from the perl debugger. 
+	The Data::Walker objects are now fully encapsulated. 
 
 	NOTE:  The walk() function has been separated into two functions, 
 	namely walk() and cli(). The usage instructions have changed.  
@@ -236,9 +401,8 @@ Version 0.15
 
 Version 0.13-0.14
 
-	Numerous internal changes:
-	  Moved functionality from the CLI-loop
-	  into distinct functions.
+	Moved some functionality from the CLI-loop
+	into distinct functions.
                   
 Version 0.12
 
@@ -256,9 +420,14 @@ Version 0.11
 	Added some new comments to the source code.
 	Various other small updates.
 
+=head1 THANKS
+
+Thanks to Matthew Persico for sending some ideas on 
+how this module might be useful in the debugger. 
+
 =head1 AUTHOR
 
-John Nolan  jpnolan@op.net  August-December 1999.
+John Nolan  jpnolan@sonic.net  August, 1999 - January 2000.
 A copyright statment is contained within the source code itself. 
 
 =cut                  
@@ -272,6 +441,8 @@ A copyright statment is contained within the source code itself.
 
 	rootname        =>  '/' ,    # Any string
 	refname         => 'ref',    # Any string
+	curname         => 'cur',    # Any string
+	parname         => 'par',    # Any string
 	scalarname      => 'scalar', # Any string
 	undefname       => 'undef',  # Any string
 
@@ -285,6 +456,7 @@ A copyright statment is contained within the source code itself.
 	skipdoublerefs  =>   1  ,  # Boolean
 	skipwarning     =>   1  ,  # Boolean
 	warning         =>   1  ,  # Boolean
+	autoprint       =>   1  ,  # Boolean
 
 	truncatescalars =>  35  ,  # Truncate to how many chars; use 0 for no truncation
 
@@ -295,6 +467,10 @@ A copyright statment is contained within the source code itself.
 
 $Config{arrow} = $Config{arrowshaft} . $Config{arrowhead}; 
 
+# Make a list of all UNIX-like commands that we are going to export
+#
+#@Commands = qw( ls ll la all lla lal cd chdir pwd print type cat dump show set );
+@Commands{@Commands} = @Commands;
 
 #---------------------------------------------------------------------------
 # Set up a new Data::Walker object
@@ -316,32 +492,48 @@ sub new {
 
 		} else {
 
-			carp "$_ is not a configuration variable for $class.";
+			print "$_ is not a configuration variable for $class.";
 		} 
 	}
 	return $self;
 
 } #End sub new
 
+
+#---------------------------------------------------------------------------
+# Undef the implicit Data::Walker object
+#
+sub unwalk { 
+
+	undef($WALKER); 
+}
+
+
 #---------------------------------------------------------------------------
 # Point a Data::Walker object at a given reference
 #
 sub walk {
 
-
-	my ($self,$ref) = @_;
+	# This code handles both OO invocation as a method and
+	# non-OO invocation
+	#
 	my $class = __PACKAGE__;
+	my ($self,$ref);
 
-	unless (defined $self and ref($self) eq $class) {
+	if (defined $_[0] and ref($_[0]) eq $class) {
 
-		carp "Function $class::walk() MUST be invoked as a method on a $class object";
-		warn "If you don't like objects, then use $class->cli() directly instead.\n";
-		return 0;
+		$self = shift;
+
+	} else {
+
+		$self = $WALKER = new Data::Walker;
 	}
+
+	$ref = shift;
 
 	unless (defined $ref and ref $ref) {
 
-		carp "Parameter is either undefined or is not a reference";
+		print "Parameter to walk is missing, undefined, or is not a reference";
 		return 0;
 	}
 
@@ -353,6 +545,8 @@ sub walk {
 	$self->{prev_refpath}  = [];
 	$self->{tmp_namepath}  = [];
 	$self->{tmp_refpath}   = [];
+
+	return $self->{cursor};  # Return a ref to the cursor
 }
 
 #---------------------------------------------------------------------------
@@ -491,7 +685,7 @@ sub down {
 
 	unless ($what_is_it =~ /(ARRAY|HASH|REF)/) {
 
-		warn "'$name' is a $what_is_it, can't cd into it.\n" 
+		print "'$name' is a $what_is_it, can't cd into it.\n" 
 			if $self->{warning};
 		$self->{cursor} = undef;  # The caller must handle this
 		return;
@@ -521,7 +715,7 @@ sub down {
 		# Remember that we have seen the current reference.
 		$recurse->{$self->{cursor}} = scalar keys(%$recurse);	
 
-		warn "Skipping down ref-to-ref.\n" if $self->{skipwarning} and $self->{warning};
+		print "Skipping down ref-to-ref.\n" if $self->{skipwarning} and $self->{warning};
 
 		if (exists $recurse->{ ${$self->{cursor}} }) {
 
@@ -538,7 +732,7 @@ sub down {
 			# and add one hop (to count the final hop back to the beginning of the loop).
 			#
 			my $hops = 1 + $recurse->{$self->{cursor}} - $recurse->{ ${$self->{cursor}} };
-			warn 
+			print 
 				"Reference loop detected: $hops ". ($hops > 1 ? "hops" : "hop") . ".\n"
 				if $self->{warning}
 			;
@@ -559,7 +753,7 @@ sub down {
 			#
 			if (ref($self->{cursor}) eq 'REF' and scalar @{$self->{refpath}} > 1) {
 
-				warn "Skipping up ref-to-ref.\n" 
+				print "Skipping up ref-to-ref.\n" 
 					if $self->{skipwarning} and $self->{warning};
 				$self->up();
 			}
@@ -598,7 +792,7 @@ sub up {
 	#
 	if ($self->{skipdoublerefs} and $name eq $self->{refname} and $#{$self->{refpath}} > 0) {
 
-		warn "Skipping up ref-to-ref.\n" if $self->{skipwarning} and $self->{warning};
+		print "Skipping up ref-to-ref.\n" if $self->{skipwarning} and $self->{warning};
 		$self->up();
 	}
 	$self->{cursor} = $self->{refpath}[-1];
@@ -618,25 +812,70 @@ sub DESTROY {
 
 
 #---------------------------------------------------------------------------
-# Use AUTOLOAD for accessor methods to config variables
+# This is used for setting configuration variables OR 
+# for invoking UNIX-like shell functions 
 #
 sub AUTOLOAD {
 
-	my ($self,$value) = @_;
-	(my $key = $AUTOLOAD) =~ s/^.*:://;
+	# Grab the name of the function we attempted to invoke
+	#
+	(my $func = $AUTOLOAD) =~ s/^.*:://;
 
-	my $msg = $self->validate_config($key,$value);
+	my $self;
 
-	carp $msg if ($msg);
+	if (defined $_[0] and ref($_[0]) eq __PACKAGE__) {
 
-	return $self->{$key};
+		$self = shift;
+		
+	} elsif (defined $WALKER and ref($WALKER) eq __PACKAGE__) {
+
+		$self = $WALKER;
+
+	} else {
+
+		print "$func (AUTOLOAD): Use the walk() function to assign a target reference.\n";
+		return "";
+	}
+
+
+	# This might be an invocation of a walker function...
+	#
+	if (exists $Commands{$func}) {
+
+		unless (exists $self->{cursor} and ref $self->{cursor}) {
+
+			print "$func (AUTOLOAD): No reference!  Please use walk() to initialize a reference to a data structure.\n";
+			return "";
+		}
+		
+		my $retval = $self->parse_command($func,@_);
+		chomp $retval;  
+
+		if ($self->{autoprint}) {
+
+			print $retval;
+			print $self->walker_pwd if $func =~ /(cd|chdir)/;
+		}
+
+		return $retval;
+
+
+	# ...or it might be an attempt to set a configuration variable.
+	#
+	} else {
+
+		my $msg = $self->walker_set($func,$_[0]);
+		print $msg if ($msg);
+		return $self->{$func};
+	}
+
 }
 
 #---------------------------------------------------------------------------
 # Check the values assigned to configuration variables,
 # and accept them if they are OK. 
 #
-sub validate_config {
+sub walker_set {
 
 	my ($self,$key,$value) = @_;
 
@@ -707,7 +946,7 @@ sub validate_config {
 
 	return $msg;
 
-} #End sub validate_config
+} #End sub walker_set
 
 
 #---------------------------------------------------------------------------
@@ -716,6 +955,8 @@ sub validate_config {
 sub walker_chdir {
 
 	my ($self,$dirspec) = @_;
+	my @temp_refpath    = ();
+	my @temp_namepath   = ();
 
 	#------------------------------
 	# Handle cd -
@@ -724,13 +965,13 @@ sub walker_chdir {
 
 		# Swap swap, fizz fizz.....
 		#
-		  @{$self->{tmp_namepath}} =      @{$self->{namepath}};
-		      @{$self->{namepath}} = @{$self->{prev_namepath}};
-		 @{$self->{prev_namepath}} =  @{$self->{tmp_namepath}};
+		         @temp_namepath   =      @{$self->{namepath}};
+		     @{$self->{namepath}} = @{$self->{prev_namepath}};
+		@{$self->{prev_namepath}} =          @temp_namepath  ;
 
-		    @{$self->{tmp_refpath}} =       @{$self->{refpath}};
-		        @{$self->{refpath}} =  @{$self->{prev_refpath}};
-		   @{$self->{prev_refpath}} =   @{$self->{tmp_refpath}};
+		         @temp_refpath   =       @{$self->{refpath}};
+		     @{$self->{refpath}} =  @{$self->{prev_refpath}};
+		@{$self->{prev_refpath}} =           @temp_refpath  ;
 
 		# Use the last ref in the (now) current refpath
 		#
@@ -743,8 +984,8 @@ sub walker_chdir {
 		# Remember our current paths into the structure, 
 		# in case we have to abort for some reason.
 		#
-		@{$self->{tmp_refpath}}  = @{$self->{refpath}};
-		@{$self->{tmp_namepath}} = @{$self->{namepath}};
+		@temp_refpath  = @{$self->{refpath}};
+		@temp_namepath = @{$self->{namepath}};
 
 	} #End if ($dirspec =~ m#^\s*-\s*$#) {
 
@@ -795,7 +1036,7 @@ sub walker_chdir {
 
 			unless ($dirspec eq $self->{refname}) {
 
-				warn "'$dirspec' does not exist.  " .
+				print "'$dirspec' does not exist.  " .
 						"Type 'cd $self->{refname}' to descend into reference.\n"
 					if $self->{warning};
 
@@ -808,9 +1049,9 @@ sub walker_chdir {
 
 			unless (exists $self->{cursor}->{$dir}) {
 
-				warn "No such element as '$leading_slash$dirspec'.\n" if $self->{warning};
-				@{$self->{refpath}}  = @{$self->{tmp_refpath}};
-				@{$self->{namepath}} = @{$self->{tmp_namepath}};
+				print "No such element as '$leading_slash$dirspec'.\n" if $self->{warning};
+				@{$self->{refpath}}  = @temp_refpath;
+				@{$self->{namepath}} = @temp_namepath;
 
 				return $self->{cursor};
 
@@ -823,9 +1064,9 @@ sub walker_chdir {
 
 			unless ($dir =~ /^\d+$/ and scalar(@{ $self->{cursor} }) > $dir) {
 
-				warn "No such element as '$leading_slash$dirspec'.\n" if $self->{warning};
-				@{$self->{refpath}}  = @{$self->{tmp_refpath}};
-				@{$self->{namepath}} = @{$self->{tmp_namepath}};
+				print "No such element as '$leading_slash$dirspec'.\n" if $self->{warning};
+				@{$self->{refpath}}  = @temp_refpath;
+				@{$self->{namepath}} = @temp_namepath;
 
 				return $self->{cursor};
 
@@ -842,10 +1083,10 @@ sub walker_chdir {
 			# there in the first place, so this message will only be printed
 			# if the author of this module has made an error.  ;) 
 			#
-			warn "Don't know how to chdir from current directory ($reftype) into '$dirspec'.\n" 
+			print "Don't know how to chdir from current directory ($reftype) into '$dirspec'.\n" 
 				if $self->{warning};
-			@{$self->{refpath}}  = @{$self->{tmp_refpath}};
-			@{$self->{namepath}} = @{$self->{tmp_namepath}};
+			@{$self->{refpath}}  = @temp_refpath;
+			@{$self->{namepath}} = @temp_namepath;
 			$self->{cursor} = $self->{refpath}[-1];
 
 		} #End if ($dir eq ...
@@ -853,12 +1094,13 @@ sub walker_chdir {
 		#------------------------------
 		# If the calls to down() or up() have failed for some reason,
 		# then return to wherever were to begin with. 
-		# Don't even bother to parse the rest of the path.
+		# Don't even bother to parse the rest of the path,
+		# just return immediately. 
 		#
 		if (not defined $self->{cursor}) {
 
-			@{$self->{refpath}}  = @{$self->{tmp_refpath}};
-			@{$self->{namepath}} = @{$self->{tmp_namepath}};
+			@{$self->{refpath}}  = @temp_refpath;
+			@{$self->{namepath}} = @temp_namepath;
 			$self->{cursor} = $self->{refpath}[-1];
 
 			return $self->{cursor};
@@ -871,8 +1113,8 @@ sub walker_chdir {
 	# Save our previous location in the structure into the "prev_" variables.
 	# The previous previous variables (meta-previous?) are now forgotton.
 	#
-	@{$self->{prev_refpath}}  = @{$self->{tmp_refpath}};
-	@{$self->{prev_namepath}} = @{$self->{tmp_namepath}};
+	@{$self->{prev_refpath}}  = @temp_refpath;
+	@{$self->{prev_namepath}} = @temp_namepath;
 
 } #End sub walker_chdir
 
@@ -885,7 +1127,7 @@ sub walker_ls {
 	my ($self,$option) = @_;
 	my ($reftype,$refpackage) = reftype($self->{cursor});
 
-	my $out = "";
+	my $retval = "";
 
 	if ($option =~ /l/) {
 
@@ -913,32 +1155,32 @@ sub walker_ls {
 
 		if ($reftype eq "REF") {
 
-			$out .= $dots;
+			$retval .= $dots;
 			my ($type,$value) = $self->printref(${ $self->{cursor} });
-			$out .= sprintf( $format, $self->{refname}, $type, $value );
+			$retval .= sprintf( $format, $self->{refname}, $type, $value );
 
 		} elsif ($reftype eq "HASH") {
 
-			$out .= $dots;
+			$retval .= $dots;
 			foreach (sort keys %{$self->{cursor}}) {
 
 				my ($type,$value) = $self->printref($self->{cursor}->{$_});
-				$out .= sprintf( $format, $_, $type, $value );
+				$retval .= sprintf( $format, $_, $type, $value );
 			}
 
 		} elsif ($reftype eq "ARRAY") {
 
-			$out .= $dots;
+			$retval .= $dots;
 			my $i = 0;
 			foreach (@{ $self->{cursor} }) {
 
 				my ($type,$value) = $self->printref($_);
-				$out .= sprintf( $format, $i++, $type, $value );
+				$retval .= sprintf( $format, $i++, $type, $value );
 			} 
 
 		} else {
 
-	 		$out .= "Current ref is a ref to " . $reftype . 
+	 		$retval .= "Current ref is a ref to " . $reftype . 
 				", don't know how to emulate ls -l in it.\n";
 		}
 
@@ -948,34 +1190,34 @@ sub walker_ls {
 
 		if ($reftype eq "REF") {
 
-			$out .= $dots . $self->{refname} . "\n";
+			$retval .= $dots . $self->{refname} . "\n";
 
 		} elsif ($reftype eq "HASH") {
 
-			$out .= $dots;
+			$retval .= $dots;
 			foreach (sort keys %{ $self->{cursor} }) {
 
-				$out .= $_. "\t";
+				$retval .= $_. "\t";
 			}
-			$out .= "\n";
+			$retval .= "\n";
 
 		} elsif ($reftype eq "ARRAY") {
 
-			$out .= $dots;
+			$retval .= $dots;
 			my $i = 0;
 			foreach (@{ $self->{cursor} }) {
 
-				$out .= $self->printref($_). "\t";
+				$retval .= $self->printref($_) . "\t";
 			}
 
 		} else {
 
-			$out .= "Current ref is a $reftype, don't know how to emulate ls in it.\n";
+			$retval .= "Current ref is a $reftype, don't know how to emulate ls in it.\n";
 		}
 
 	}
 
-	return $out;
+	return $retval;
 
 } #End sub walker_ls
 
@@ -988,35 +1230,35 @@ sub walker_cat {
 	my ($self,$target) = @_;
 	my ($reftype,$refpackage) = reftype($self->{cursor});
 
-	my $out = "";
+	my $retval = "";
 
 	# Prints "print--> "...
-	$out = "print$self->{arrowshaft}$self->{arrow} '" . $target . "'\n";
+	$retval = "print$self->{arrowshaft}$self->{arrow} '" . $target . "'\n";
 			
 	if ($target eq ".") {
 
-		$out = $self->{cursor};
+		$retval = $self->{cursor};
 
 	} elsif ($target eq '..') {
 
-		$out = ${$self->{refpath}[-2]} if (scalar @{$self->{namepath}} >  1);
-		$out = ${$self->{refpath}[-1]} if (scalar @{$self->{namepath}} <= 1);
+		$retval = ${$self->{refpath}[-2]} if (scalar @{$self->{namepath}} >  1);
+		$retval = ${$self->{refpath}[-1]} if (scalar @{$self->{namepath}} <= 1);
 
 	} elsif ($reftype eq "HASH") {
 
-		$out = $self->{cursor}->{$target};
+		$retval = $self->{cursor}->{$target};
 
 	} elsif ($reftype eq "ARRAY") {
 
-		$out = $self->{cursor}->[$target];
+		$retval = $self->{cursor}->[$target];
 
 	} else {
 
-		warn "Current ref is a $reftype, don't know how to print from it."
+		print "Current ref is a $reftype, don't know how to print from it."
 			if $self->{warning};
 	}
 
-	return $out;
+	return $retval;
 
 } #End sub walker_cat
 
@@ -1039,44 +1281,307 @@ sub walker_dump {
 	my ($self,$target) = @_;
 	my ($reftype,$refpackage) = reftype($self->{cursor});
 
+	my $retval = "";
+
 	# Pass config values directly to Data::Dumper
 	#
 	local $Data::Dumper::Indent   = $self->{indent};
 	local $Data::Dumper::Maxdepth = $self->{maxdepth};
 
 	# Prints "dump--> "...
-	print "dump$self->{arrowshaft}$self->{arrow} '",$target,"'\n";
+	$retval .= "dump$self->{arrowshaft}$self->{arrow} '$target'\n";
 			
 	if ($target eq ".") {
 
-		print Data::Dumper->Dump( [ $self->{cursor} ] );
+		$retval .= Data::Dumper->Dump( [ $self->{cursor} ] );
 
 	} elsif ($target eq '..') {
 
-		print Data::Dumper->Dump([ $self->{refpath}[-2] ],[ $self->{namepath}[-2] ]) 
+		$retval .= Data::Dumper->Dump([ $self->{refpath}[-2] ],[ $self->{namepath}[-2] ]) 
 			if (scalar @{$self->{namepath}} >  1);
-		print Data::Dumper->Dump([ $self->{refpath}[-1] ],[ $self->{namepath}[-1] ]) 
+		$retval .= Data::Dumper->Dump([ $self->{refpath}[-1] ],[ $self->{namepath}[-1] ]) 
 			if (scalar @{$self->{namepath}} <= 1);
 
 	} elsif ($reftype eq "REF") {
 
-		print Data::Dumper->Dump( [ ${$self->{cursor}} ], [ $target ] );
+		$retval .= Data::Dumper->Dump( [ ${$self->{cursor}} ], [ $target ] );
 
 	} elsif ($reftype eq "HASH") {
 
-		print Data::Dumper->Dump( [ $self->{cursor}->{$target} ], [ $target ] );
+		$retval .= Data::Dumper->Dump( [ $self->{cursor}->{$target} ], [ $target ] );
 
 	} elsif ($reftype eq "ARRAY") {
 
-		print Data::Dumper->Dump( [ $self->{cursor}->[$target] ], [ $target ] );
+		$retval .= Data::Dumper->Dump( [ $self->{cursor}->[$target] ], [ $target ] );
 
 	} else {
 
-		warn "Current ref is a $reftype, don't know how to dump things from it."
+		$retval .= "Current ref is a $reftype, don't know how to dump things from it."
 			if $self->{warning};
 	}
 
+	return $retval;
+
 } #End sub walker_dump
+
+
+
+#---------------------------------------------------------------------------
+# Format the CLI prompt (this is called after each command)
+#
+sub walker_getprompt {
+
+	my $self = shift;
+
+	#------------------------------
+	# Take a copy of the namepath, because we are going to munge it
+	#
+	my @temp_namepath = @{ $self->{namepath} };
+
+	my (%seen,%seen_twice);
+	my $count = 1;
+
+	for (my $i = 0; $i < scalar @{$self->{refpath}}; $i++) {
+
+		# Check to see if we are seeing this ref for the *second* time.
+		# If so, define it in the %seen_twice hash. 
+		#
+		if (
+			exists $seen{ $self->{refpath}[$i] } 
+			and 
+			not exists $seen_twice{ $self->{refpath}[$i] } 
+		) {
+
+			$seen_twice{ $self->{refpath}[$i] } = $count++;
+		}
+
+		$seen{ $self->{refpath}[$i] } = 1;
+	}
+
+	for (my $i = 0; $i < scalar @{$self->{refpath}}; $i++) {
+
+		$temp_namepath[$i] .= "-" . $seen_twice{ $self->{refpath}[$i] } . "-"
+			if exists $seen_twice{ $self->{refpath}[$i] };
+	}
+
+	return sprintf  "%s$self->{promptchar} ", join $self->{arrow},@temp_namepath;
+
+} #End sub walker_getprompt
+
+
+#---------------------------------------------------------------------------
+# Format help messages
+#
+sub walker_help {
+
+	my ($self,$arg) = @_;
+	my $retval = "";
+
+	if (defined $arg and $arg =~ /show/) {
+
+		($retval =<<"		EOM") =~ s/^\s+//gm;
+		The following items can be configured
+		(current value is in parenthesis):
+	
+		rootname        how the root node is displayed ("$$self{rootname}")
+		refname         how embedded refs are listed ("$$self{refname}")
+		scalarname      how simple scalars are listed ("$$self{scalarname}")
+		undefname       how unefined scalars are listed ("$$self{undefname}")
+		promptchar      customize the session prompt ("$$self{promptchar}")
+		arrowshaft      first part of ref arrow ("$$self{arrowshaft}")
+		arrowhead       last  part of ref arrow ("$$self{arrowhead}")
+	
+		maxdepth        maximum dump-depth (Data::Dumper) ($$self{maxdepth})
+		indent          amount of indent (Data::Dumper) ($$self{indent})
+		lscol1width     column widths for 'ls' displays ($$self{lscol1width})
+		lscol2width     column widths for 'ls' displays ($$self{lscol2width})
+	
+		showrecursion   note recursion in the prompt ($$self{showrecursion})
+		showids         show ref id numbers in ls lists ($$self{showids})
+		skipdoublerefs  hop over ref-to-refs during walks ($$self{skipdoublerefs})
+		skipwarning     warn when hopping over ref-to-refs ($$self{skipwarning})
+		truncatescalars truncate scalars in 'ls' displays ($$self{truncatescalars})
+	                	(use 0 for no truncation)
+
+		type "show <configname>" to display a value
+		type "set <configname> <value>" to assign a new value
+		EOM
+
+	} else {
+
+		($retval =<<"		EOM") =~ s/^\s+//gsm;
+		The following commands are supported:
+
+		cd <target>          like UNIX cd
+		ls                   like UNIX ls (also respects options -a, -l)
+		print <target>       prints the item as a scalar
+		dump <target>        invokes Data::Dumper
+		set <key> <value>    set configuration variables
+		show <key>           show configuration variables
+		! or eval            eval arbitrary perl (careful!)
+		help                 this help message
+		help set             lists the availabe config variables
+		EOM
+	}
+
+	return $retval;
+
+} #End sub walker_help
+
+
+#---------------------------------------------------------------------------
+# Show the walker's config variables
+#
+sub walker_show {
+
+	my ($self,$arg) = @_;
+	my $retval = "";
+
+	if (defined $arg and $arg ne "") {
+
+		my $key = lc $arg;
+		$key =~ s/^\s+//;
+		$key =~ s/\s+$//;
+
+		unless (exists $self->{$key}) {
+
+			return "No such config variable as '$key'\n";
+		}
+
+		# Print out the variable key and value.
+		# Quote anything that's not a decimal value.
+		#
+		if ($self->{$key} =~ /^(?:0|-?[1-9]\d{0,8})$/) {
+			$retval = "$key = $self->{$key}\n";
+		} else {
+			$retval = "$key = '$self->{$key}'\n";
+		}
+
+	} else {
+
+		foreach (sort { $a cmp $b } keys %Config) {
+
+			# Print out the variable key and value.
+			# Quote anything that's not a decimal value.
+			#
+			if ($self->{$_} =~ /^(?:0|-?[1-9]\d{0,8})$/) {
+				$retval .= sprintf "%-15s = %s\n", lc($_), $self->{$_};
+			} else {
+				$retval .= sprintf "%-15s = '%s'\n", lc($_), $self->{$_};
+			}
+		}
+	}
+
+	return $retval;
+}
+
+#---------------------------------------------------------------------------
+# Parse commands, either from the CLI or from an AUTOLOADed function.
+# Dispatch to the proper internal methods.
+#
+sub parse_command {
+
+	my $self = shift;
+	my $cmd  = join ' ',@_;
+
+	$cmd = '' unless defined $cmd;
+	my $retval = "";
+
+	#------------------------------------------------------------
+	# Emulate the pwd command
+	#
+	if ($cmd =~ /^(pwd)$/) {
+
+		$retval .=  $self->walker_pwd . "\n";
+
+	#------------------------------------------------------------
+	# Print the help blurb
+	#
+	} elsif ($cmd =~ /^\s*(help|h)\s*$/) {
+
+		$retval .=  $self->walker_help;
+
+	} elsif ($cmd =~ /^\s*help\s+(set|show)\s*$/) {
+
+		$retval .=  $self->walker_help("show");
+
+	#------------------------------------------------------------
+	# Emulate cd
+	#
+	} elsif ($cmd =~ /^\s*(cd|chdir)\s+(.+)$/) {
+
+		# Change directories, but don't print anything.
+		# (walker_chdir returns a reference)
+		#
+		$self->walker_chdir($2);
+
+	#------------------------------------------------------------
+	# Emulate ls -l
+	#
+	} elsif ($cmd =~ /^\s*(lal|lla|all|ll\s+-?a|ls\s+-?al|ls\s+-?la|dir|ls\s+-?a\s+-?l|ls\s+-?l\s+-?a|la\s+-?l)\s*$/) {
+
+		$retval .=  $self->walker_ls("la");
+		
+	} elsif ($cmd =~ /^\s*(ll|ls\s+-?l|ls\s+-?l)\s*$/) {
+
+		$retval .=  $self->walker_ls("l");
+		
+	} elsif ($cmd =~ /^\s*(ls\s+-?a|la)\s*$/) {
+
+		$retval .=  $self->walker_ls("a");
+
+	} elsif ($cmd =~ /^\s*(l|ls)\s*$/) {
+
+		$retval .=  $self->walker_ls("");
+
+	#------------------------------------------------------------
+	# Emulate cat 
+	#
+	} elsif ($cmd =~ /^\s*(cat|type|print|p)\s+(.+?)\s*$/) {
+
+		$retval .=  $self->walker_cat($2) . "\n";
+
+	#------------------------------------------------------------
+	# Invoke dump
+	#
+	} elsif ($cmd =~ /^\s*(dump|d)\s+(.+?)\s*(\d*)$/) {
+
+		$retval .=  $self->walker_dump($2);
+
+	} elsif ($cmd =~ /^\s*(dump|d)\s*$/) {
+
+		$retval .=  $self->walker_dump('.');
+
+	#------------------------------------------------------------
+	# Adjust config settings ("set indent 2")
+	#
+	} elsif ($cmd =~ /^\s*set\s+(\S+?)\s+(.+)$/i) {
+
+		my ($key,$value) = (lc($1),$2);
+		$value =~ s/^[=\s]*//;
+		$value =~ s/[\s]*$//;
+
+		my $msg = $self->walker_set($key,$value);
+		$retval .=  "$msg.\n" if $msg;
+
+
+	#------------------------------------------------------------
+	# Show config settings  ("show indent" etc.)
+	#
+	} elsif ($cmd =~ /^\s*show(.*)$/i) {
+
+		my $arg = defined($1) ? $1 : "";
+
+		$retval .=  $self->walker_show($arg);
+
+	} else {
+
+		$retval .= "Ignoring command '$cmd', could not parse. (Type 'help' for help.)\n";
+	}
+
+	return $retval;
+
+} #End sub parse_command
 
 
 #---------------------------------------------------------------------------
@@ -1084,38 +1589,48 @@ sub walker_dump {
 #
 sub cli {
 
+	# This code handles both OO-invocation as a method and
+	# non-OO invocation
+	#
 	my $class = __PACKAGE__;
-	my ($self,$ref) = @_;;
+	my ($self,$ref);
 
-	if (defined($_[0]) and $_[0] eq $class) {
+	if (defined $_[0] and $_[0] eq $class and defined $_[1] and ref $_[1]) {
 
-		# If cli() was invoked as a class method, then we
-		# create an object on the fly.  This object will 
+		# cli() was invoked as a class method, 
+		# so we create an object on the fly.  This object will 
 		# be destroyed as soon as $self goes out of scope, 
-		# at the end of this function.
+		# which is at the end of this function.
 		#
 		$self = new($class);
+		$ref  = $_[1];
 		$self->walk($ref) or return;
 
-	} elsif (ref($self) eq $class and defined($ref) and reftype($ref) eq "REF")  {
+	} elsif (defined $_[0] and ref $_[0] eq $class and defined $_[1] and ref $_[1])  {
 
+		# cli() was invoked as a method on an object,
+		# so we use this object.
+		#
+		($self,$ref) = @_;
 		$self->walk($ref) or return;
 
-	} elsif (ref($self) eq $class and defined $self->{cursor})  {
+	} elsif (ref $_[0] eq $class and defined $_[0]->{cursor})  {
 
-		# Intentionally empty, no need to invoke walk().
-		# Don't return. 
+		# cli() was entered on a Data::Walker object which already exists,
+		# so we use that.
+		#
+		($self,$ref) = @_;
+
+	} elsif (defined($WALKER) and ref($WALKER) eq __PACKAGE__) {
+
+		# cli() was not invoked with any parameters, but there is an
+		# implicit Data::Walker object, so we use that. 
+		#
+		$self = $WALKER;
 
 	} else {
 
-		(my $msg =<<"			EOC") =~ s/^\t\t\t+//gsm;
-			Usage:
-			   ${class}->cli(\$ref) or 
-			   my \$w = new $class;  \$w->walk(\$ref);  \$w->cli();  or
-			   my \$w = new $class;  \$w->cli(\$ref);
-			where \$ref is the target data structure.
-			EOC
-		carp $msg;
+		print "cli:  No reference!";
 		return;
 	}
 
@@ -1132,228 +1647,45 @@ sub cli {
 
 		return if m/^\s*(q|qu|quit|ex|exi|exti|exit)\s*$/i;    # 50 ways to leave your CLI
 
-		#------------------------------------------------------------
-		# Emulate the pwd command
-		#
-		if (/^(pwd)$/) {
-
-			print $self->walker_pwd,"\n";
-
-		#------------------------------------------------------------
-		# Small help utility
-		#
-		} elsif (/^\s*(help|h)\s*$/) {
-
-			(my $blurb =<<"			EOM") =~ s/^\s+//gsm;
-			The following commands are supported:
-
-			cd <target>          like UNIX cd
-			ls                   like UNIX ls (also respects options -a, -l)
-			print <target>       prints the item as a scalar
-			dump <target>        invokes Data::Dumper
-			set <key> <value>    set configuration variables
-			show <key>           show configuration variables
-			! or eval            eval arbitrary perl (careful!)
-			help                 this help message
-			help set             lists the availabe config variables
-			EOM
-
-			print $blurb;
-
-		#------------------------------------------------------------
-		# Small help utility, continued
-		#
-		} elsif (/^\s*help\s+(set|show)\s*$/) {
-
-			(my $blurb =<<"			EOM") =~ s/^\t+//gm;
-			The following items can be configured
-			(current value is in parenthesis):
-
-			rootname        how the root node is displayed ("$$self{rootname}")
-			refname         how embedded refs are listed ("$$self{refname}")
-			scalarname      how simple scalars are listed ("$$self{scalarname}")
-			undefname       how unefined scalars are listed ("$$self{undefname}")
-			promptchar      customize the session prompt ("$$self{promptchar}")
-			arrowshaft      first part of ref arrow ("$$self{arrowshaft}")
-			arrowhead       last  part of ref arrow ("$$self{arrowhead}")
-
-			maxdepth        maximum dump-depth (Data::Dumper) ($$self{maxdepth})
-			indent          amount of indent (Data::Dumper) ($$self{indent})
-			lscol1width     column widths for 'ls' displays ($$self{lscol1width})
-			lscol2width     column widths for 'ls' displays ($$self{lscol2width})
-
-			showrecursion   note recursion in the prompt ($$self{showrecursion})
-			showids         show ref id numbers in ls lists ($$self{showids})
-			skipdoublerefs  hop over ref-to-refs during walks ($$self{skipdoublerefs})
-			skipwarning     warn when hopping over ref-to-refs ($$self{skipwarning})
-			truncatescalars truncate scalars in 'ls' displays ($$self{truncatescalars})
-			                (use 0 for no truncation)
-
-			type "show <configname>" to display a value
-			type "set <configname> <value>" to assign a new value
-			EOM
-
-			print $blurb;
-
-		#------------------------------------------------------------
-		# Emulate cd
-		#
-		} elsif (/^\s*(cd|chdir)\s+(.+)$/) {
-
-			$self->walker_chdir($2);
-
-		#------------------------------------------------------------
-		# Emulate ls -l
-		#
-		} elsif (/^\s*(ll\s+-a|ls\s+-al|ls\s+-la|dir|ls\s+-a\s+-l|ls\s+-l\s+-a|la\s+-l)\s*$/) {
-
-			print $self->walker_ls("la");
-			
-		} elsif (/^\s*(ll|ls\s+-l|ls\s+-l)\s*$/) {
-
-			print $self->walker_ls("l");
-			
-		} elsif (/^\s*(ls\s+-a|la)\s*$/) {
-
-			print $self->walker_ls("a");
-
-		} elsif (/^\s*(l|ls)\s*$/) {
-
-			print $self->walker_ls("");
-
-		#------------------------------------------------------------
-		# Emulate cat 
-		#
-		} elsif (/^\s*(cat|type|print|p)\s+(.+?)\s*$/) {
-
-			print $self->walker_cat($2),"\n";
-
-		#------------------------------------------------------------
-		# Invoke dump
-		#
-		} elsif (/^\s*(dump|d)\s+(.+?)\s*(\d*)$/) {
-
-			print $self->walker_dump($2);
-
-		#------------------------------------------------------------
-		# Adjust config settings ("set indent 2")
-		#
-		} elsif (/^\s*set\s+(\S+?)\s+(.+)$/i) {
-
-			my ($key,$value) = (lc($1),$2);
-			$value =~ s/^[=\s]*//;
-			$value =~ s/[\s]*$//;
-
-			my $msg = $self->validate_config($key,$value);
-			print "$msg.\n" if $msg;
-
-
-		#------------------------------------------------------------
-		# Show config settings  ("show indent" etc.)
-		#
-		} elsif (/^\s*show\s*$/i or /^\s*show all\s*$/i) {
-
-			foreach (sort { $a cmp $b } keys %Config) {
-
-				# Print out the variable key and value.
-				# Quote anything that's not a decimal value.
-				#
-				if ($self->{$_} =~ /^(?:0|-?[1-9]\d{0,8})$/) {
-					printf "%-15s = %s\n", lc($_), $self->{$_};
-				} else {
-					printf "%-15s = '%s'\n", lc($_), $self->{$_};
-				}
-			}
-
-		} elsif (/^\s*show\s+(\S+?)\s*$/i) {
-
-			next COMMAND unless defined $1;
-
-			my $key = lc($1);
-
-			unless (exists $self->{$key}) {
-
-				print "No such config variable as '$key'\n";
-				next COMMAND;
-			}
-
-			# Print out the variable key and value.
-			# Quote anything that's not a decimal value.
-			#
-			if ($self->{$key} =~ /^(?:0|-?[1-9]\d{0,8})$/) {
-				print "$key = $self->{$key}\n";
-			} else {
-				print "$key = '$self->{$key}'\n";
-			}
 
 		#------------------------------------------------------------
 		# eval:  Take whatever the user typed in and eval it
 		#
-		} elsif (/^\s*(\!|eval)\s/) {
-
-			s/^\s*(\!|eval)\s//;
+		if (s/^\s*(\!|eval)\s+//) {
 
 			# prints "eval--> "...
-			print "eval$self->{arrowshaft}$self->{arrow} ",$_,"\n";
+			#
+			print "eval$self->{arrowshaft}$self->{arrow} $_\n";
+
+			# Let the user refer
+			my ($par,$cur); 
+			$par = $self->{refpath}->[-2] if scalar @{$self->{refpath}} >  1; 
+			$par = $self->{refpath}->[-1] if scalar @{$self->{refpath}} == 1; 
+			$cur = $self->{cursor};            
+
+			s/\$$self->{curname}\b/\$cur/g;
+			s/\$$self->{parname}\b/\$par/g;
+
 			my $res = eval;
+			$res = "undef" unless defined $res;
 
-			unless (defined $res) {
-
-				print "\nundef\n";
-
-			} else {
-
-				print "\n$res\n";
-			}
+			# prints "retv--> "...
+			#
+			print "retv$self->{arrowshaft}$self->{arrow} $res\n";
 
 		} else {
 
-				print "Ignoring command '$_', could not parse. (Type 'help' for help.)\n";
+			print $self->parse_command($_);
 		}
 
 	} continue {  #continuing COMMAND: while(<>) {
 
-		#------------------------------
-		# At the end of each loop, we might be inside a new directory.  
-		# Figure out what the prompt should look like. 
-		#
-		# Take a *copy* of namepath and store it as temp_namepath.
-		#
-		@{ $self->{temp_namepath} } = @{ $self->{namepath} };
-
-		my (%seen,%seen_twice);
-		my $count = 1;
-
-		for (my $i = 0; $i < scalar @{$self->{refpath}}; $i++) {
-
-			# Check to see if we are seeing this ref for the *second* time.
-			# If so, define it in the %seen_twice hash. 
-			#
-			if (
-				exists $seen{ $self->{refpath}[$i] } 
-				and 
-				not exists $seen_twice{ $self->{refpath}[$i] } 
-			) {
-
-				$seen_twice{ $self->{refpath}[$i] } = $count++;
-			}
-
-			$seen{ $self->{refpath}[$i] } = 1;
-		}
-
-		for (my $i = 0; $i < scalar @{$self->{refpath}}; $i++) {
-
-			$self->{temp_namepath}[$i] .= "-" . $seen_twice{ $self->{refpath}[$i] } . "-"
-				if exists $seen_twice{ $self->{refpath}[$i] };
-		}
-
-		printf "%s$self->{promptchar} ",join $self->{arrow},@{$self->{temp_namepath}};
-
+		print $self->walker_getprompt;
 
 	} #End COMMAND: while(<>) {
 
-
 } #End sub cli
+
 
 1;
 
