@@ -1,5 +1,6 @@
 NAME
-    Data::Walker - A tool for navigating through Perl data structures
+    Data::Walker - A tool for navigating through Perl data
+    structures
 
 SYNOPSIS
       use Data::Walker;
@@ -7,27 +8,28 @@ SYNOPSIS
       # see below for details
 
 DESCRIPTION
-    This module allows you to "walk" an arbitrary Perl data structure in the
-    same way that you can walk a directory tree from the command line. It is
-    meant to be used interactively with a live user.
+    This module allows you to "walk" an arbitrary Perl data
+    structure in the same way that you can walk a directory tree
+    from the command line. It is meant to be used interactively with
+    a live user.
 
 INSTALLATION
-    To install this package, just change to the directory which you created
-    by untarring the package, and type the following:
+    To install this package, just change to the directory which you
+    created by untarring the package, and type the following:
 
             perl Makefile.PL
             make test
             make
             make install
 
-    This will copy Walker.pm to your perl library directory for use by all
-    perl scripts. You probably must be root to do this, unless you have
-    installed a personal copy of perl or you have write access to a Perl lib
-    directory.
+    This will copy Walker.pm to your perl library directory for use
+    by all perl scripts. You probably must be root to do this,
+    unless you have installed a personal copy of perl or you have
+    write access to a Perl lib directory.
 
 USAGE
-    You open an interacive "command-prompt"-style session by invoking the
-    walk function.
+    You open an interacive "command-prompt"-style session by
+    invoking the walk function.
 
             use Data::Walker;
             Data::Walker->walk( $data_structure );
@@ -38,8 +40,8 @@ USAGE
             $Data::Walker::Config{'skipdoublerefs'} = 0;
             Data::Walker->walk( $data_structure );
 
-    If you prefer to use object-style notation, then you can use this syntax
-    to customize the settings:
+    If you prefer to use object-style notation, then you can use
+    this syntax to customize the settings:
 
             use Data::Walker;
             my $w1 = new Data::Walker;
@@ -53,44 +55,81 @@ USAGE
 
     Imagine a data structure like so:
 
-            $s = {
-                    a => [ 10, 20, 30 ],
-                    b => { 
-                            "x" => 40, 
-                            "y" => 50, 
-                            "z" => 60 
-                    },
+            my $s = {
+
+            a => [ 10, 20, "thirty" ],
+            b => {
+                    "w" => "forty",
+                    "x" => "fifty",
+                    "y" => 60,
+                    "z" => \70,
+            },
+            c => sub { print "I'm a data structure!\n"; },
+            d => 80,
             };
-            $s->{c} = \$s->{a};       
+            $s->{e} = \$s->{d};
 
-    Here is a sample interactive session examining this structure ('/>' is
-    the prompt):
+    Here is a sample interactive session examining this structure
+    ('/>' is the prompt):
 
-            /> ls -al
-            ..                    HASH (3)
-            .                     HASH (3)
-            a                     ARRAY (3)
-            b                     HASH (3)
-            c                     REF->ARRAY (3)     
+            />
+            /> ls -l
+            a                               ARRAY (3)
+            b                               HASH (4)
+            c                               CODE
+            d                               80
+            e                               SCALAR: 80
             /> cd a
-            /->{a}> ls -l
-            0                     scalar: 10
-            1                     scalar: 20
-            2                     scalar: 30
-            /->{a}>          
-            /->{a}> cd ..
+            /->{a}> ls -al
+            ..                              HASH (5)
+            .                               ARRAY (3)
+            0                               10
+            1                               20
+            2                               thirty
+            /->{a}> cd ../b
+            /->{b}> ls -al
+            ..                              HASH (5)
+            .                               HASH (4)
+            w                               forty
+            x                               fifty
+            y                               60
+            z                               SCALAR: 70
+            /->{b}> cd ..
             /> dump b
             dump--> 'b'
             $b = {
-              'x' => 40,
-              'y' => 50,
-              'z' => 60
+              'x' => 'fifty',
+              'y' => 60,
+              'z' => \70,
+              'w' => 'forty'
             };
-            />              
-
-    The following commands are available from within the command-line
-    session. With these commands, you can navigate around the data structure
-    as if it were a directory tree.
+            /> ls -al
+            ..                              HASH (5)
+            .                               HASH (5)
+            a                               ARRAY (3)
+            b                               HASH (4)
+            c                               CODE
+            d                               80
+            e                               SCALAR: 80
+            /> ! $ref->{d} += 3
+            eval--> $ref->{d} += 3
+            
+            83
+            /> ls -al
+            ..                              HASH (5)
+            .                               HASH (5)
+            a                               ARRAY (3)
+            b                               HASH (4)
+            c                               CODE
+            d                               83
+            e                               SCALAR: 83
+            /> 
+            
+            
+    The following commands are available from within the
+    command-line session.  With these commands, you can 
+    navigate around the data structure as if it
+    were a directory tree.
 
             cd <target>          like UNIX cd
             ls                   like UNIX ls (also respects options -a, -l)
@@ -98,8 +137,9 @@ USAGE
             dump <target>        invokes Data::Dumper
             set <key> <value>    set configuration variables
             show <key>           show configuration variables
+            ! or eval            eval arbitrary perl (careful!)
             help                 this help message
-            help set             lists the availabe config variables
+            help set             lists the available config variables
 
     For each session, the following items can be configured:
 
@@ -117,10 +157,18 @@ USAGE
             arrowhead       (default:  '>' )  ('>' in '->')
             arrowshaft      (default:  '-' )  ('-' in '->')
 
-    This is the initial release of this module. Future releases will include
-    better documentation and tests.
+    This is the initial release of this module. Future releases will
+    include better documentation and tests.
+
+CHANGES
+    Version 0.11
+
+            Fixed some misspellings in the help information.
+            Modified the pretty-print format of scalars.
+            Added some new comments to the source code.
+            Various other small updates.
 
 AUTHOR
-    John Nolan jpnolan@op.net August 1999. A copyright statment is contained
-    within the source code itself.
+    John Nolan jpnolan@op.net August-September 1999. A copyright
+    statment is contained within the source code itself.
 

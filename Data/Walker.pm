@@ -2,7 +2,7 @@
 
 package Data::Walker;
 
-# Copyright (c) 1997-1999 John Nolan. All rights reserved.
+# Copyright (c) 1999 John Nolan. All rights reserved.
 # This program is free software.  You may modify and/or
 # distribute it under the same terms as Perl itself.
 # This copyright notice must remain attached to the file.
@@ -10,9 +10,6 @@ package Data::Walker;
 # You can run this file through either pod2man or pod2html
 # to produce pretty documentation in manual or html file format
 # (these utilities are part of the Perl 5 distribution).
-#
-# POD documentation is distributed throughout the actual code
-# so that it also functions as comments.    
 
 use Carp;
 use Data::Dumper;
@@ -20,7 +17,7 @@ use strict;
 
 use vars qw( $VERSION @ISA %Config $AUTOLOAD );
 
-$VERSION = '0.10';
+$VERSION = '0.11';
 sub Version { $VERSION };
 
 ####################################################################
@@ -90,43 +87,78 @@ can use this syntax to customize the settings:
 
 Imagine a data structure like so:  
 
-	$s = {
-		a => [ 10, 20, 30 ],
-		b => { 
-			"x" => 40, 
-			"y" => 50, 
-			"z" => 60 
-		},
+	my $s = {
+
+        a => [ 10, 20, "thirty" ],
+        b => {
+                "w" => "forty",
+                "x" => "fifty",
+                "y" => 60,
+                "z" => \70,
+        },
+        c => sub { print "I'm a data structure!\n"; },
+        d => 80,
 	};
-	$s->{c} = \$s->{a};       
+	$s->{e} = \$s->{d};
 
 
 Here is a sample interactive session examining this structure ('/>' is the prompt):
 
 
-	/> ls -al
-	..                    HASH (3)
-	.                     HASH (3)
-	a                     ARRAY (3)
-	b                     HASH (3)
-	c                     REF->ARRAY (3)     
+	/>
+	/> ls -l
+	a                               ARRAY (3)
+	b                               HASH (4)
+	c                               CODE
+	d                               80
+	e                               SCALAR: 80
 	/> cd a
-	/->{a}> ls -l
-	0                     scalar: 10
-	1                     scalar: 20
-	2                     scalar: 30
-	/->{a}>          
-	/->{a}> cd ..
+	/->{a}> ls -al
+	..                              HASH (5)
+	.                               ARRAY (3)
+	0                               10
+	1                               20
+	2                               thirty
+	/->{a}> cd ../b
+	/->{b}> ls -al
+	..                              HASH (5)
+	.                               HASH (4)
+	w                               forty
+	x                               fifty
+	y                               60
+	z                               SCALAR: 70
+	/->{b}> cd ..
 	/> dump b
 	dump--> 'b'
 	$b = {
-	  'x' => 40,
-	  'y' => 50,
-	  'z' => 60
+	  'x' => 'fifty',
+	  'y' => 60,
+	  'z' => \70,
+	  'w' => 'forty'
 	};
-	/>              
-
-
+	/> ls -al
+	..                              HASH (5)
+	.                               HASH (5)
+	a                               ARRAY (3)
+	b                               HASH (4)
+	c                               CODE
+	d                               80
+	e                               SCALAR: 80
+	/> ! $ref->{d} += 3
+	eval--> $ref->{d} += 3
+	
+	83
+	/> ls -al
+	..                              HASH (5)
+	.                               HASH (5)
+	a                               ARRAY (3)
+	b                               HASH (4)
+	c                               CODE
+	d                               83
+	e                               SCALAR: 83
+	/> 
+	
+	
 The following commands are available from within the
 command-line session.  With these commands, you can 
 navigate around the data structure as if it
@@ -138,8 +170,9 @@ were a directory tree.
 	dump <target>        invokes Data::Dumper
 	set <key> <value>    set configuration variables
 	show <key>           show configuration variables
+	! or eval            eval arbitrary perl (careful!)
 	help                 this help message
-	help set             lists the availabe config variables
+	help set             lists the available config variables
 
 
 For each session, the following items can be configured:
@@ -162,9 +195,20 @@ For each session, the following items can be configured:
 This is the initial release of this module.  Future releases
 will include better documentation and tests.  
 
+=head1 CHANGES
+
+Version 0.11
+
+	Fixed some misspellings in the help information.
+	Modified the pretty-print format of scalars.
+	Added some new comments to the source code.
+	Modified the sorts of references that you can cd into.
+	(Now can only cd into a REF, ARRAY, HASH or a blessed ref.)
+	Various other small updates.
+
 =head1 AUTHOR
 
-John Nolan  jpnolan@op.net  August 1999.
+John Nolan  jpnolan@op.net  August-September 1999.
 A copyright statment is contained within the source code itself. 
 
 =cut                  
@@ -245,7 +289,7 @@ sub isBlessed ($) {
 # Print out a short string describing the type of thing
 # this reference is pointing to.  
 #
-sub printref ($) {
+sub printref {
 
 	my ($self,$ref,$recurse) = @_;
 
@@ -259,7 +303,7 @@ sub printref ($) {
 
 		my $type = "";
 
-		if (ref $ref eq "REF") {                                 
+		if (ref $ref eq "REF") {                                
 
 			# If this is a ref-to-ref, then recurse until we find 
 			# what it ultimately points to.  
@@ -296,7 +340,7 @@ sub printref ($) {
 
 			} elsif (ref $ref eq "SCALAR" and     defined $$ref  ) { 
 
-				$type = ": " . $ref;
+				$type = ": " . $self->printref($$ref,1);
 
 			} elsif (isBlessed $ref) {                               
 
@@ -310,13 +354,16 @@ sub printref ($) {
 
 	} else {
 
+		# It's not a refernce, so it must actually be a scalar. 
+		#
 		my $retval = $ref;
 
 		if ($self->{truncatescalars} > 0 and length($ref) > $self->{truncatescalars}) {
 
 			$retval = substr($ref,0,$self->{truncatescalars}) . "..." ;
 		}
-		return "scalar: $retval";
+
+		return $retval;
 
 	} #End if (not defined $ref) -- elsif (ref $ref) 
 
@@ -331,9 +378,11 @@ sub down {
 	my ($self,$namepath,$name,$refpath,$ref,$recurse) = @_;
 	$recurse = {} unless defined $recurse;
 
-	unless (ref $ref) {
+	my $reftype = ref($ref) ? ref($ref) . " reference" : "scalar";
 
-		warn "'$name' is not a reference, can't cd into it.\n";
+	unless ($reftype =~ /(ARRAY|HASH|REF)/ or isBlessed($ref) ) {
+
+		warn "'$name' is a $reftype, can't cd into it.\n";
 		return $refpath->[-1];
 	}
 
@@ -346,17 +395,36 @@ sub down {
 	push @$refpath, $ref;
 
 	#------------------------------
-	# If the reference itself refers to a reference, 
-	# then skip it an go down further.  This is recursive, 
+	# If the 'skipdoublerefs' config value is set,
+	# and if the reference itself refers to a reference, 
+	# then skip it and go down further.  This is recursive, 
 	# so we will keep skipping until we come to 
-	# something which is not a reference to a reference. 
+	# something which is not a ref-to-ref. 
+	#
+	# We need to watch out for reference loops. 
+	# Keep track of already-seen references in %$recurse.
+	# Pass $recurse to this function, recursively. 
 	#
 	if ($self->{skipdoublerefs} and ref $ref eq "REF") {
 
+		# Remember that we have seen the current reference.
 		$recurse->{$ref} = scalar keys(%$recurse);	
 
 		if (exists $recurse->{$$ref}) {
 
+			#------------------------------
+			# At this point, $ref is the current reference, and $$ref is 
+			# the reference it points to.  But if $recurse->{$$ref} exists,
+			# then we must have seen it before.  This means we have detected a 
+			# reference loop!
+			#
+			# The value of $recurse->{$ref} is the number of reference-hops 
+			# to the current reference, and the value of $recurse->{$$ref} 
+			# the number of hops to $$ref, which is a smaller number.
+			#
+			# To get the size of the reference loop, get the number of hops between them,
+			# and add one hop (to count the final hop back to the beginning of the loop).
+			#
 			my $hops = 1 + $recurse->{$ref} - $recurse->{$$ref};
 			warn "Reference loop detected: $hops ". ($hops > 1 ? "hops" : "hop") . ".\n";
 
@@ -364,8 +432,29 @@ sub down {
 
 			warn "Skipping down ref-to-ref.\n";
 			$ref = $self->down($namepath,$self->{refname},$refpath,$$ref,$recurse);
-		}
-	} 
+
+			#------------------------------
+			# The call to the down() method in the previous line will fail
+			# if the target happens to be a SCALAR or some other item which
+			# we can't cd into.  In this case, we need to cd back up, 
+			# until the current ref is no longer a ref-to-ref.
+			#
+			# The following lines of code will be executed one time 
+			# for each *successful* call to the down() method, 
+			# which is what we want.  We back out just like we backed in.
+			#
+			if (ref $ref eq "REF" and scalar @$refpath > 1) {
+				warn "Skipping up ref-to-ref.\n";
+				$ref = $self->up($namepath,$refpath);
+			}
+
+		} #End if (exists $recurse->{$$ref}) 
+
+	} #End if ($self->{skipdoublerefs} and ref $ref eq "REF") 
+
+	# If 'skipdoublerefs' is not set, then we will be able to cd into
+	# ref-to-refs and run ls from within them.
+
 
 	return $ref;
 }
@@ -382,6 +471,9 @@ sub up {
 	my $name = pop @$namepath;
 	           pop @$refpath;
 
+	# We don't need to watch out for recursion here, because
+	# we can only go back out the way we came.  
+	#
 	if ($self->{skipdoublerefs} and $name eq $self->{refname} and $#{ $refpath } > 0) {
 
 		warn "Skipping up ref-to-ref.\n";
@@ -527,9 +619,9 @@ sub walk {
 		return if m/^(q|qu|quit|ex|exit)$/i;    # 50 ways to leave your session
 
 		#------------------------------------------------------------
-		# Emulate pwd 
+		# Things we'd like to do, but don't do yet
 		#
-		if (/^(pwd|dir)$/) {
+		if (/^(pwd)$/) {
 
 			print "Command '$_' is not yet implemented\n";
 
@@ -539,7 +631,7 @@ sub walk {
 		} elsif (/^\s*(help|h)\s*$/) {
 
 			(my $blurb =<<"			EOM") =~ s/^\s+//gsm;
-			The followind commands are supported:
+			The following commands are supported:
 
 			cd <target>          like UNIX cd
 			ls                   like UNIX ls (also respects options -a, -l)
@@ -547,6 +639,7 @@ sub walk {
 			dump <target>        invokes Data::Dumper
 			set <key> <value>    set configuration variables
 			show <key>           show configuration variables
+			! or eval            eval arbitrary perl (careful!)
 			help                 this help message
 			help set             lists the availabe config variables
 			EOM
@@ -554,7 +647,7 @@ sub walk {
 			print $blurb;
 
 		#------------------------------------------------------------
-		# Small help utility
+		# Small help utility, continued
 		#
 		} elsif (/^\s*(help set|help show)\s*$/) {
 
@@ -567,9 +660,9 @@ sub walk {
 		#------------------------------------------------------------
 		# Emulate cd
 		#
-		} elsif (/^\s*(?:cd|chdir)\s+(.+)$/) {
+		} elsif (/^\s*(cd|chdir)\s+(.+)$/) {
 
-			my $dirspec = $1;
+			my $dirspec = $2;
 
 			#------------------------------
 			# Handle cd -
@@ -710,11 +803,11 @@ sub walk {
 		#------------------------------------------------------------
 		# Emulate ls -l
 		#
-		} elsif (/^\s*(ll|ls\s+-l|ls\s+-al|ls\s+-la|ls\s+-l)\s*$/) {
+		} elsif (/^\s*(ll|ls\s+-l|ls\s+-al|ls\s+-la|ls\s+-l|dir)\s*$/) {
 
 			my $dots = "";
 
-			if (/a/) {
+			if (/a|dir/) {
 				$dots .= sprintf "%-$self->{lscolwidth}s\t%s\n", '..', $self->printref($refpath[-2]), if (scalar @namepath >  1);
 				$dots .= sprintf "%-$self->{lscolwidth}s\t%s\n", '..', $self->printref($refpath[-1]), if (scalar @namepath <= 1);
 				$dots .= sprintf "%-$self->{lscolwidth}s\t%s\n", '.',  $self->printref($refpath[-1]), ;
@@ -744,8 +837,8 @@ sub walk {
 
 			} else {
 
-					print "Current ref is a " . ref($ref) . 
-						", don't know how to emulate ls -l in it.\n";
+				print "Current ref is a ref to " . ref($ref) . 
+					", don't know how to emulate ls -l in it.\n";
 			}
 			
 		#------------------------------------------------------------
@@ -894,10 +987,14 @@ sub walk {
 		#------------------------------------------------------------
 		# eval:  Take whatever the user typed in and eval it
 		#
-		} elsif (/^\s*\!/) {
+		} elsif (/^\s*(\!|eval)\s/) {
 
-			s/^\s*\!//;
-			s/(\W)\.(?!\w)/$1\$ref/;
+			my ($par,$cur);
+			$par = $refpath[-2] if scalar @refpath >  1;
+			$par = $refpath[-1] if scalar @refpath == 0;
+			$cur = $ref;
+
+			s/^\s*(\!|eval)\s//;
 
 			# prints "eval--> "...
 			print "eval$self->{arrowshaft}$self->{arrow} ",$_,"\n";

@@ -3,23 +3,23 @@
 # Quick and dirty test script
 #-------------------------------------------------------
 
-use lib '.';
 use strict;
 use Data::Walker;
 
-my $s;
+my $s = {
 
-$s = {
-
-	a => [ 10, 20, 30 ],
+	a => [ 10, 20, "thirty" ],
 	b => { 
-		"x" => 10, 
-		"y" => 20, 
-		"z" => 30 
+		"w" => "forty", 
+		"x" => "fifty", 
+		"y" => 60,
+		"z" => \70,
 	},
+	c => sub { print "I'm a data structure!\n"; },
+	d => 80,
 };
 
-$s->{c} = \$s->{a};
+$s->{e} = \$s->{d};
 
 my $p = Data::Walker->new();
 $p->walk($s);
