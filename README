@@ -1,0 +1,126 @@
+NAME
+    Data::Walker - A tool for navigating through Perl data structures
+
+SYNOPSIS
+      use Data::Walker;
+      Data::Walker->walk( $data_structure );
+      # see below for details
+
+DESCRIPTION
+    This module allows you to "walk" an arbitrary Perl data structure in the
+    same way that you can walk a directory tree from the command line. It is
+    meant to be used interactively with a live user.
+
+INSTALLATION
+    To install this package, just change to the directory which you created
+    by untarring the package, and type the following:
+
+            perl Makefile.PL
+            make test
+            make
+            make install
+
+    This will copy Walker.pm to your perl library directory for use by all
+    perl scripts. You probably must be root to do this, unless you have
+    installed a personal copy of perl or you have write access to a Perl lib
+    directory.
+
+USAGE
+    You open an interacive "command-prompt"-style session by invoking the
+    walk function.
+
+            use Data::Walker;
+            Data::Walker->walk( $data_structure );
+
+    You can customize certain features of the session, like so:
+
+            use Data::Walker;
+            $Data::Walker::Config{'skipdoublerefs'} = 0;
+            Data::Walker->walk( $data_structure );
+
+    If you prefer to use object-style notation, then you can use this syntax
+    to customize the settings:
+
+            use Data::Walker;
+            my $w1 = new Data::Walker;
+            $w1->walk( $data_structure );
+
+            my $w2 = new Data::Walker( 'skipdoublerefs' => 0 );
+            $w2->walk( $data_structure );
+            
+            $w2->showrecursion(0);
+            $w2->walk( $data_structure );
+
+    Imagine a data structure like so:
+
+            $s = {
+                    a => [ 10, 20, 30 ],
+                    b => { 
+                            "x" => 40, 
+                            "y" => 50, 
+                            "z" => 60 
+                    },
+            };
+            $s->{c} = \$s->{a};       
+
+    Here is a sample interactive session examining this structure ('/>' is
+    the prompt):
+
+            /> ls -al
+            ..                    HASH (3)
+            .                     HASH (3)
+            a                     ARRAY (3)
+            b                     HASH (3)
+            c                     REF->ARRAY (3)     
+            /> cd a
+            /->{a}> ls -l
+            0                     scalar: 10
+            1                     scalar: 20
+            2                     scalar: 30
+            /->{a}>          
+            /->{a}> cd ..
+            /> dump b
+            dump--> 'b'
+            $b = {
+              'x' => 40,
+              'y' => 50,
+              'z' => 60
+            };
+            />              
+
+    The following commands are available from within the command-line
+    session. With these commands, you can navigate around the data structure
+    as if it were a directory tree.
+
+            cd <target>          like UNIX cd
+            ls                   like UNIX ls (also respects options -a, -l)
+            print <target>       prints the item as a scalar
+            dump <target>        invokes Data::Dumper
+            set <key> <value>    set configuration variables
+            show <key>           show configuration variables
+            help                 this help message
+            help set             lists the availabe config variables
+
+    For each session, the following items can be configured:
+
+            rootname        (default:  '/' )  How the root node is displayed 
+            refname         (default: 'ref')  how embedded refs are listed
+            maxdepth        (default:   1  )  maximum dump-depth (Data::Dumper)
+            indent          (default:   1  )  amount of indent (Data::Dumper)
+            lscolwidth      (default:  30  )  column withs for 'ls' displays
+
+            showrecursion   (default:   1  )  note recursion in the prompt
+            skipdoublerefs  (default:   1  )  hop over ref-to-refs during walks
+            truncatescalars (default:   0  )  truncate scalars in 'ls' displays
+
+            promptchar      (default:  '>' )  customize the session prompt
+            arrowhead       (default:  '>' )  ('>' in '->')
+            arrowshaft      (default:  '-' )  ('-' in '->')
+
+    This is the initial release of this module. Future releases will include
+    better documentation and tests.
+
+AUTHOR
+    John Nolan jpnolan@op.net August 1999. A copyright statment is contained
+    within the source code itself.
+
