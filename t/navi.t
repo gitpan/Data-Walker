@@ -28,14 +28,14 @@ sub test {
 	my $ret = eval $string;
 	$ret = 'undef' if not defined $ret;
 
-	if($ret =~ /^$want$/) {
+	if($ret =~ /^$want$/m) {
 
 		print "ok $tcounter\n";
 
 	} else {
 		print "not ok $tcounter\n",
 		"   -- '$string' returned '$ret'\n", 
-		"   -- expected =~ '/$want/'\n"
+		"   -- expected =~ /$want/\n"
 	}
 }
 
@@ -62,7 +62,7 @@ bless $s, Data::Walker;
 
 
 #------------------------------------------------------
-# 2-6  - Test basic formatting
+# Test basic formatting
 #
 $want = 'ARRAY';              test q($w->printref( $s->{a} )); 
 $want = 'HASH';               test q($w->printref( $s->{b} ));
@@ -71,7 +71,7 @@ $want = 'scalar';             test q($w->printref( $s->{d} ));
 $want = 'Data::Walker=HASH';  test q($w->printref( $s      ));
 
 #------------------------------------------------------
-# 7-11  - Test ref-to-refs
+# Test ref-to-refs
 #
 $want = 'REF->ARRAY';         test q($w->printref(\$s->{a} ));
 $want = 'REF->HASH';          test q($w->printref(\$s->{b} ));
@@ -81,7 +81,7 @@ $want = 'REF->Data::Walker=HASH';
                               test q($w->printref(\$s      ));
 
 #------------------------------------------------------
-# 12-17  - Test formatting with ids
+# Test formatting with ids
 #
 $w->showids(1);
 #
@@ -96,7 +96,7 @@ $w->showids(0);
 
 
 #------------------------------------------------------
-# 18-24  - Test walking up and down trees
+# Test walking up and down trees
 # 
 $w->warning(0);          # Hide Data::Walker warnings during tests
 $w->{namepath} = ['/'];  # Set during CLI;  fudge it here
@@ -112,7 +112,7 @@ $want = "undef";                 test q($w->down("d", $s->{d}));
 
 
 #------------------------------------------------------
-# 25-28 - Test walking up and down trees with ref-to-refs
+# Test walking up and down trees with ref-to-refs
 # 
 $w->skipdoublerefs(1);
 #

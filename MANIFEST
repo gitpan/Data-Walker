@@ -1,7 +1,9 @@
 Data/Walker.pm
 Makefile.PL
 sample
-t/walker.t
+sample_db
+t/navi.t
+t/commands.t
 README
 MANIFEST
 WARNING

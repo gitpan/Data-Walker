@@ -1,20 +1,51 @@
+
+README file for Data::Walker 0.20 
+
+
 NAME
     Data::Walker - A tool for navigating through Perl data structures
 
 SYNOPSIS
+    Without any explicit objects:
+
       use Data::Walker;
-      Data::Walker->walk( $data_structure );
-      # see below for details
+      Data::Walker->cli( $data_structure );
+
+    Object-style invocation:
+
+      use Data::Walker;
+      my $w = new Data::Walker;
+      $w->walk( $data_structure );
+      $w->ls("-al");
+      $w->pwd;
+      $w->cli;
+
+    Importing methods into the current package:
+
+      use Data::Walker qw(:direct);
+      walk $data_structure;
+      ls "-al";
+      pwd;
+      cli;
 
 DESCRIPTION
     This module allows you to "walk" an arbitrary Perl data structure in the
-    same way that you can walk a directory tree from the command line. It is
-    meant to be used interactively with a live user, as a command-line
-    interface.
+    same way that you can walk a directory tree from a UNIX command line. It
+    reuses familiar unix commands (such as "ls", "cd", "pwd") and applies
+    these to data structures.
+
+    It has a command-line interface which behaves like a UNIX shell. You can
+    also use object-style sytax to invoke the CLI commands from outside the
+    CLI. Data::Walker objects are encapsulated, so that you can hop into and
+    out of a CLI without losing state, and you can have several Data::Walker
+    objects pointing at different structures.
+
+    The main functions can also be exported and used directly from within
+    the Perl debugger's CLI.
 
 INSTALLATION
-    To install this package, just change to the directory which you created
-    by untarring the package, and type the following:
+    To install this package, just into the directory which you created by
+    untarring the package, and type the following:
 
             perl Makefile.PL
             make test
@@ -28,9 +59,6 @@ INSTALLATION
 
 USAGE
     You open a command-line interface by invoking the cli() function.
-
-            use Data::Walker;
-            Data::Walker->cli( $data_structure );
 
             use Data::Walker;
             Data::Walker->cli( $data_structure );
@@ -60,6 +88,20 @@ USAGE
             $w3->showrecursion(0);
             $w3->cli();
 
+    You can also import most of the functions directly into the current
+    package. This is especially useful from within the debugger (see the
+    example below).
+
+            use Data::Walker qw(:direct);
+            walk $data_structure;
+            ls "-al";
+            pwd;
+            cli;
+
+    When you use the :direct pragma and invoke the walk() function, a
+    Data::Walker object is implicitly created, and is available as
+    $Data::Walker::WALKER.
+
     Imagine a data structure like so:
 
             my $s = {
@@ -76,8 +118,8 @@ USAGE
             };
             $s->{e} = \$s->{d};
 
-    Here is a sample interactive session examining this structure ('/>' is
-    the prompt):
+    Here is a sample CLI session examining this structure ('/>' is the
+    prompt):
 
             /> 
             /> ls -l
@@ -118,10 +160,9 @@ USAGE
             c               CODE                      
             d               scalar                    80
             e               SCALAR                    80
-            /> ! $ref->{d} += 3
-            eval--> $ref->{d} += 3
-            
-            83
+            /> ! $cur->{d} += 3
+            eval--> $cur->{d} += 3
+            retv--> 83
             /> ls -al
             ..              HASH                      (5)
             .               HASH                      (5)
@@ -131,11 +172,116 @@ USAGE
             d               scalar                    83
             e               SCALAR                    83
             /> 
-            
-            
-    The following commands are available from within the CLI.
-    With these commands, you can navigate around the data 
-    structure as if it were a directory tree.
+
+    Below is a sample debugger session examining this structure.
+
+    Note that the walk() function returns a reference to the "cursor", which
+    is itself a reference to whatever is the "current directory," so to
+    speak. The actual Data::Walker object iself is managed implicitly, and
+    is available as $Data::Walker::WALKER. When you are finished, you can
+    undef this object directly, or use the unwalk() function, which does
+    this for you. But if you saved a copy of the cursor, then you will need
+    to undef this on your own.
+
+            (violet) ~/perl/walker/Data-Walker-0.18 > perl -d sample_db
+
+            Loading DB routines from perl5db.pl version 1.0401
+            Emacs support available.
+
+            Enter h or `h h' for help.
+
+            main::(sample:19):              d => 80,
+              DB<1> n
+            main::(sample:22):      $s->{e}      = \$s->{d};
+              DB<1> n
+            main::(sample:30):      1;
+              DB<1> use Data::Walker qw(:direct)
+
+              DB<2> $cur = walk $s
+
+              DB<3> pwd
+            /
+              DB<4> ls
+            a       b       c       d       e
+              DB<5> lal
+            ..              HASH                      (5)
+            .               HASH                      (5)
+            a               ARRAY                     (3)
+            b               HASH                      (4)
+            c               CODE
+            d               scalar                    80
+            e               SCALAR                    80
+              DB<6> cd a
+            /->{a}        
+              DB<7> ll
+            0               scalar                    10
+            1               scalar                    20
+            2               scalar                    'thirty'      
+              DB<8> cd '../b'
+            /->{b}
+              DB<9> lal
+            ..              HASH                      (5)
+            .               HASH                      (4)
+            w               scalar                    'forty'
+            x               scalar                    'fifty'
+            y               scalar                    60
+            z               SCALAR                    70       
+              DB<10> cd '..'
+            /
+              DB<11> dump b
+            dump--> 'b'
+            $b = {
+              'x' => 'fifty',
+              'y' => 60,
+              'z' => \70,
+              'w' => 'forty'
+            };                  
+              DB<12> ll
+            a               ARRAY                     (3)
+            b               HASH                      (4)
+            c               CODE
+            d               scalar                    80
+            e               SCALAR                    80
+              DB<13> $$cur->{d} += 3
+
+              DB<14> ll
+            a               ARRAY                     (3)
+            b               HASH                      (4)
+            c               CODE
+            d               scalar                    83
+            e               SCALAR                    83
+              DB<15>                   
+              DB<16> pwd
+            /
+              DB<17> cli
+            /> cd b
+            /->{b}> ls -l
+            w               scalar                    'forty'
+            x               scalar                    'fifty'
+            y               scalar                    60
+            z               SCALAR                    70     
+            /->{b}> print y
+            60
+            /->{b}> print x
+            fifty
+            /->{b}> exit
+
+              DB<18> pwd
+            /->{b}
+              DB<19> ll
+            w               scalar                    'forty'
+            x               scalar                    'fifty'
+            y               scalar                    60
+            z               SCALAR                    70
+              DB<20> unwalk
+
+              DB<21> undef $cur
+
+              DB<22> 
+
+    The following commands are available from within the CLI. With these
+    commands, you can navigate around the data structure as if it were a
+    directory tree.
 
             cd <target>          like UNIX cd
             ls                   like UNIX ls (also respects options -a, -l)
@@ -164,25 +310,36 @@ USAGE
             skipdoublerefs  (default:   1 )  hop over ref-to-refs during walks
             skipwarning     (default:   1 )  warn when hopping over ref-to-refs
             truncatescalars (default:  37 )  truncate scalars in 'ls' displays
+            autoprint       (default:   1 )  print directory after chdir when not in CLI
 
             promptchar      (default:  '>')  customize the session prompt
             arrowshaft      (default:  '-')  ('-' in '->')
             arrowhead       (default:  '>')  ('>' in '->')
 
+            curname         (default:  'cur'  )  how to refer to the cursor for evals
+            parname         (default:  'par'  )  how to refer to the parent ref for evals
+
     This is an alpha release of this module.
 
 CHANGES
+    Version 0.19-0.20
+
+       Added new tests and updated the documentation.
+
+    Version 0.18
+
+            Completely separated the CLI loop, command-parsing regexes, 
+            and the functions which implement the commands.  AUTOLOAD is now
+            set up to handle any commands that the CLI can parse (except
+            for eval() ).  
+
+            By using the :direct pragma, you can now import AUTOLOADed functions 
+            into the current package, so that you can easily invoke them 
+            from the perl debugger.
+
     Version 0.16-0.17
 
-            The module is now fully object oriented. 
-            This will make it easier to use the module
-            outside of the CLI.
-
-            In the next version, I will completely separate out 
-            the CLI loop, command-parsing regexes, and the functions which 
-            implement the commands.  After that, AUTOLOAD can be set up to parse 
-            any commands that the CLI can parse.  This will make it 
-            more convenient to use the module from the perl debugger. 
+            The Data::Walker objects are now fully encapsulated. 
 
             NOTE:  The walk() function has been separated into two functions, 
             namely walk() and cli(). The usage instructions have changed.  
@@ -195,9 +352,8 @@ CHANGES
 
     Version 0.13-0.14
 
-            Numerous internal changes:
-              Moved functionality from the CLI-loop
-              into distinct functions.
+            Moved some functionality from the CLI-loop
+            into distinct functions.
                       
     Version 0.12
 
@@ -215,7 +371,11 @@ CHANGES
             Added some new comments to the source code.
             Various other small updates.
 
+THANKS
+    Thanks to Matthew Persico for sending some ideas on how this module
+    might be useful in the debugger.
+
 AUTHOR
-    John Nolan jpnolan@op.net August-December 1999. A copyright statment is
-    contained within the source code itself.
+    John Nolan jpnolan@sonic.net August, 1999 - January 2000. A copyright
+    statment is contained within the source code itself.
 

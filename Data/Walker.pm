@@ -32,7 +32,7 @@ push @Commands, qw/chdir/;    # chdir is not exported
 
 use strict;
 
-$VERSION = '0.18';
+$VERSION = '0.20';
 sub Version { $VERSION };
 
 
@@ -87,7 +87,7 @@ from within the Perl debugger's CLI.
 
 =head1 INSTALLATION
 
-To install this package, just chdir into the directory which
+To install this package, just into the directory which
 you created by untarring the package, and type the following:
 
 	perl Makefile.PL
@@ -165,7 +165,7 @@ Imagine a data structure like so:
 	$s->{e} = \$s->{d};
 
 
-Here is a sample interactive session examining this structure ('/>' is the prompt):
+Here is a sample CLI session examining this structure ('/>' is the prompt):
 
 
 	/> 
@@ -224,7 +224,7 @@ Here is a sample interactive session examining this structure ('/>' is the promp
 Below is a sample debugger session examining this structure.
 
 Note that the walk() function returns a reference to the "cursor",
-which is a reference to whatever is the "current directory,"
+which is itself a reference to whatever is the "current directory,"
 so to speak.  The actual Data::Walker object iself is managed
 implicitly, and is available as $Data::Walker::WALKER. 
 When you are finished, you can undef this object directly, 
@@ -233,7 +233,7 @@ But if you saved a copy of the cursor, then you will need to
 undef this on your own. 
 
 
-	(violet) ~/perl/walker/Data-Walker-0.18 > perl -d sample
+	(violet) ~/perl/walker/Data-Walker-0.18 > perl -d sample_db
 
 	Loading DB routines from perl5db.pl version 1.0401
 	Emacs support available.
@@ -292,7 +292,7 @@ undef this on your own.
 	c               CODE
 	d               scalar                    80
 	e               SCALAR                    80
-	  DB<13> $cur->{d} += 3
+	  DB<13> $$cur->{d} += 3
 
 	  DB<14> ll
 	a               ARRAY                     (3)
@@ -362,7 +362,7 @@ For each session (or object) the following items can be configured:
 	skipdoublerefs  (default:   1 )  hop over ref-to-refs during walks
 	skipwarning     (default:   1 )  warn when hopping over ref-to-refs
 	truncatescalars (default:  37 )  truncate scalars in 'ls' displays
-	autoprint       (default:   1 )  print CLI commands when not in CLI
+	autoprint       (default:   1 )  print directory after chdir when not in CLI
 
 	promptchar      (default:  '>')  customize the session prompt
 	arrowshaft      (default:  '-')  ('-' in '->')
@@ -374,6 +374,10 @@ For each session (or object) the following items can be configured:
 This is an alpha release of this module.  
 
 =head1 CHANGES
+
+Version 0.19-0.20
+
+   Added new tests and updated the documentation.
 
 Version 0.18
 
@@ -456,7 +460,7 @@ A copyright statment is contained within the source code itself.
 	skipdoublerefs  =>   1  ,  # Boolean
 	skipwarning     =>   1  ,  # Boolean
 	warning         =>   1  ,  # Boolean
-	autoprint       =>   1  ,  # Boolean
+	autoprint       =>  ''  ,  # Boolean
 
 	truncatescalars =>  35  ,  # Truncate to how many chars; use 0 for no truncation
 
@@ -546,7 +550,7 @@ sub walk {
 	$self->{tmp_namepath}  = [];
 	$self->{tmp_refpath}   = [];
 
-	return $self->{cursor};  # Return a ref to the cursor
+	return \$self->{cursor};  # Return a ref to the cursor
 }
 
 #---------------------------------------------------------------------------
@@ -830,6 +834,7 @@ sub AUTOLOAD {
 	} elsif (defined $WALKER and ref($WALKER) eq __PACKAGE__) {
 
 		$self = $WALKER;
+		$self->{autoprint} = 1 if $self->{autoprint} eq "";
 
 	} else {
 
@@ -958,6 +963,9 @@ sub walker_chdir {
 	my @temp_refpath    = ();
 	my @temp_namepath   = ();
 
+	$dirspec =~ s/^\s+//;  # Strip leading whitespace
+	$dirspec =~ s/\s+$//;  # Strip trailing whitespace
+
 	#------------------------------
 	# Handle cd -
 	#
@@ -1000,7 +1008,7 @@ sub walker_chdir {
 		$#{$self->{namepath}} = 0;
 		$#{$self->{refpath}}  = 0;
 
-		# Set ref to the first item in the refpath
+		# Set cursor to the first item in the refpath
 		$self->{cursor} = $self->{refpath}[0];
 
 		# Strip any leading '/' chars from $dirspec
@@ -1034,11 +1042,15 @@ sub walker_chdir {
 
 		} elsif ($reftype eq "REF") {
 
-			unless ($dirspec eq $self->{refname}) {
+			unless ($_ eq $self->{refname}) {
 
-				print "'$dirspec' does not exist.  " .
+				print "'$leading_slash$dirspec' does not exist.  " .
 						"Type 'cd $self->{refname}' to descend into reference.\n"
 					if $self->{warning};
+
+				@{$self->{refpath}}  = @temp_refpath;
+				@{$self->{namepath}} = @temp_namepath;
+				$self->{cursor} = $self->{refpath}[-1];
 
 				return $self->{cursor};
 			}
@@ -1050,8 +1062,10 @@ sub walker_chdir {
 			unless (exists $self->{cursor}->{$dir}) {
 
 				print "No such element as '$leading_slash$dirspec'.\n" if $self->{warning};
+
 				@{$self->{refpath}}  = @temp_refpath;
 				@{$self->{namepath}} = @temp_namepath;
+				$self->{cursor} = $self->{refpath}[-1];
 
 				return $self->{cursor};
 
@@ -1067,6 +1081,7 @@ sub walker_chdir {
 				print "No such element as '$leading_slash$dirspec'.\n" if $self->{warning};
 				@{$self->{refpath}}  = @temp_refpath;
 				@{$self->{namepath}} = @temp_namepath;
+				$self->{cursor} = $self->{refpath}[-1];
 
 				return $self->{cursor};
 
@@ -1132,7 +1147,7 @@ sub walker_ls {
 	if ($option =~ /l/) {
 
 		my $dots = "";
-		my $format = "%-$self->{lscol1width}s\t%-$self->{lscol2width}s %s\n";
+		my $format = "%-$self->{lscol1width}s %-$self->{lscol2width}s %s\n";
 
 		if ($option =~ /a/) {
 
