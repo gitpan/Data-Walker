@@ -1,9 +1,10 @@
 
-README file for Data::Walker 1.04 
+README file for Data::Walker 1.05 
 
 
 NAME
-    Data::Walker - A tool for navigating through Perl data structures
+    Data::Walker - A tool for navigating through Perl data
+    structures
 
 SYNOPSIS
     Without any explicit objects:
@@ -29,36 +30,38 @@ SYNOPSIS
       cli;
 
 DESCRIPTION
-    This module allows you to "walk" an arbitrary Perl data structure in the
-    same way that you can walk a directory tree from a UNIX command line. It
-    reuses familiar unix commands (such as "ls", "cd", "pwd") and applies
-    these to data structures.
+    This module allows you to "walk" an arbitrary Perl data
+    structure in the same way that you can walk a directory tree
+    from a UNIX command line. It reuses familiar unix commands (such
+    as "ls", "cd", "pwd") and applies these to data structures.
 
-    It has a command-line interface which behaves like a UNIX shell. You can
-    also use object-style sytax to invoke the CLI commands from outside the
-    CLI. Data::Walker objects are encapsulated, so that you can hop into and
-    out of a CLI without losing state, and you can have several Data::Walker
-    objects pointing at different structures.
+    It has a command-line interface which behaves like a UNIX shell.
+    You can also use object-style sytax to invoke the CLI commands
+    from outside the CLI. Data::Walker objects are encapsulated, so
+    that you can hop into and out of a CLI without losing state, and
+    you can have several Data::Walker objects pointing at different
+    structures.
 
-    The main functions can also be imported and used directly from within
-    the Perl debugger's CLI.
+    The main functions can also be imported and used directly from
+    within the Perl debugger's CLI.
 
 INSTALLATION
-    To install this package, just into the directory which you created by
-    untarring the package, and type the following:
+    To install this package, just into the directory which you
+    created by untarring the package, and type the following:
 
             perl Makefile.PL
             make test
             make
             make install
 
-    This will copy Walker.pm to your perl library directory for use by all
-    perl scripts. You probably must be root to do this, unless you have
-    installed a personal copy of perl or you have write access to a Perl lib
-    directory.
+    This will copy Walker.pm to your perl library directory for use
+    by all perl scripts. You probably must be root to do this,
+    unless you have installed a personal copy of perl or you have
+    write access to a Perl lib directory.
 
 USAGE
-    You open a command-line interface by invoking the cli() function.
+    You open a command-line interface by invoking the cli()
+    function.
 
             use Data::Walker;
             Data::Walker->cli( $data_structure );
@@ -69,9 +72,10 @@ USAGE
             $Data::Walker::Config{'skipdoublerefs'} = 0;
             Data::Walker->cli( $data_structure );
 
-    If you prefer to use object-style notation, then you can use this syntax
-    to customize the settings. You can invoke the walk() method directly,
-    our you can let the cli() method call walk() implicitly:
+    If you prefer to use object-style notation, then you can use
+    this syntax to customize the settings. You can invoke the walk()
+    method directly, our you can let the cli() method call walk()
+    implicitly:
 
             use Data::Walker;
             my $w1 = new Data::Walker;
@@ -88,9 +92,9 @@ USAGE
             $w3->showrecursion(0);
             $w3->cli();
 
-    You can also import most of the functions directly into the current
-    package. This is especially useful from within the debugger (see the
-    example below).
+    You can also import most of the functions directly into the
+    current package. This is especially useful from within the
+    debugger (see the example below).
 
             use Data::Walker qw(:direct);
             walk $data_structure;
@@ -98,8 +102,8 @@ USAGE
             pwd;
             cli;
 
-    When you use the :direct pragma and invoke the walk() function, a
-    Data::Walker object is implicitly created, and is available as
+    When you use the :direct pragma and invoke the walk() function,
+    a Data::Walker object is implicitly created, and is available as
     $Data::Walker::WALKER.
 
     Imagine a data structure like so:
@@ -118,8 +122,8 @@ USAGE
             };
             $s->{e} = \$s->{d};
 
-    Here is a sample CLI session examining this structure ('/>' is the
-    prompt):
+    Here is a sample CLI session examining this structure ('/>' is
+    the prompt):
 
             /> 
             /> ls -l
@@ -175,13 +179,14 @@ USAGE
 
     Below is a sample debugger session examining this structure.
 
-    Note that the walk() function returns a reference to the "cursor", which
-    is itself a reference to whatever is the "current directory," so to
-    speak. The actual Data::Walker object iself is managed implicitly, and
-    is available as $Data::Walker::WALKER. When you are finished, you can
-    undef this object directly, or use the unwalk() function, which does
-    this for you. But if you saved a copy of the cursor, then you will need
-    to undef this on your own.
+    Note that the walk() function returns a reference to the
+    "cursor", which is itself a reference to whatever is the
+    "current directory," so to speak. The actual Data::Walker object
+    iself is managed implicitly, and is available as
+    $Data::Walker::WALKER. When you are finished, you can undef this
+    object directly, or use the unwalk() function, which does this
+    for you. But if you saved a copy of the cursor, then you will
+    need to undef this on your own.
 
             (violet) ~/perl/walker/Data-Walker-0.18 > perl -d sample_db
 
@@ -279,9 +284,9 @@ USAGE
 
               DB<22> 
 
-    The following commands are available from within the CLI. With these
-    commands, you can navigate around the data structure as if it were a
-    directory tree.
+    The following commands are available from within the CLI. With
+    these commands, you can navigate around the data structure as if
+    it were a directory tree.
 
             cd <target>          like UNIX cd
             ls                   like UNIX ls (also respects options -a, -l)
@@ -293,7 +298,8 @@ USAGE
             help                 this help message
             help set             lists the available config variables
 
-    For each session (or object) the following items can be configured:
+    For each session (or object) the following items can be
+    configured:
 
             rootname        (default:  '/'    )  displays the root node 
             refname         (default:  'ref'  )  displays embedded refs
@@ -320,7 +326,18 @@ USAGE
             parname         (default:  'par'  )  how to refer to the parent ref for evals
 
 CHANGES
-    * Version 1.02-1.03
+    * Version 1.05
+                Patch to the test scripts for compatibility with 
+                perl 5.8.0,  which stringifies references-to-references 
+                differently.  In previous versions of perl, 
+                references-to-references were stringified
+                as 'SCALAR(0x???)', but perl 5.8.0 stringifies
+                them as 'REF(0x???)'. 
+
+                All versions of perl's 'ref' function return 
+                'REF' for references-to-references. 
+
+    * Version 1.02-1.04
                 Minor changes to installer tests.
 
     * Version 1.01
@@ -375,15 +392,15 @@ CHANGES
                 Various other small updates.
 
 THANKS
-    Thanks to Gurusamy Sarathy for writing Data::Dumper, and to Dominique
-    Dumont for writing Tk::ObjScanner.
+    Thanks to Gurusamy Sarathy for writing Data::Dumper, and to
+    Dominique Dumont for writing Tk::ObjScanner.
 
-    Thanks to Matthew Persico for sending some ideas on how this module
-    might be useful in the debugger.
+    Thanks to Matthew Persico for sending some ideas on how this
+    module might be useful in the debugger.
 
-    Thanks to Scott Lindsey for pointing out that this module is useful for
-    reading files created with the Storable module, and for sending a sample
-    script to do this.
+    Thanks to Scott Lindsey for pointing out that this module is
+    useful for reading files created with the Storable module, and
+    for sending a sample script to do this.
 
 AUTHOR
     John Nolan jpnolan@sonic.net 1999,2000. A copyright statment is

@@ -32,7 +32,7 @@ push @Commands, qw/chdir/;    # chdir is not exported
 
 use strict;
 
-$VERSION = '1.04';
+$VERSION = '1.05';
 sub Version { $VERSION };
 
 
@@ -375,6 +375,18 @@ For each session (or object) the following items can be configured:
 =head1 CHANGES
 
 =over 4
+
+=item * Version 1.05
+
+	Patch to the test scripts for compatibility with 
+	perl 5.8.0,  which stringifies references-to-references 
+	differently.  In previous versions of perl, 
+	references-to-references were stringified
+	as 'SCALAR(0x???)', but perl 5.8.0 stringifies
+	them as 'REF(0x???)'. 
+
+	All versions of perl's 'ref' function return 
+	'REF' for references-to-references. 
 
 =item * Version 1.02-1.04
 

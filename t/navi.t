@@ -20,6 +20,8 @@ my $id       = '\(0x.+\)';  # Regex to match the id of stringified refs
 my $w        = new Data::Walker;
 my $s        = {};
 
+my $perl_version = $];
+
 
 sub test {
 	$tcounter++;
@@ -121,7 +123,11 @@ $want = "Data::Walker=HASH$id";  test q($w->up() );
 #
 $w->skipdoublerefs(0);
 #
-$want = "SCALAR$id";             test q($w->down("e", $s->{e}));
+if($perl_version >= 5.008) {
+	$want = "REF$id";             test q($w->down("e", $s->{e}));
+} else {
+	$want = "SCALAR$id";          test q($w->down("e", $s->{e}));
+}
 $want = "Data::Walker=HASH$id";  test q($w->up());
 
 
