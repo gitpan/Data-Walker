@@ -1,7 +1,5 @@
 This is an early release of this module.  It is still
 very much an alpha, and is actively being "improved".
-The basic functionality is ready, but has not yet been 
-reviewed extensively.  It may contain bugs.
 
-In upcoming versions, I will add some better
-documentation and some installation tests.
+The basic functionality is ready, but it is still
+being tinkered with.  It may contain some stupid bugs.

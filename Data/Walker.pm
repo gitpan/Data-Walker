@@ -13,14 +13,14 @@ package Data::Walker;
 
 use Carp;
 use Data::Dumper;
-use overload;
+use overload;           # We will use overload::StrVal() 
 
 use strict;
 
 use vars qw( $VERSION @ISA $AUTOLOAD );
 use vars qw( %Config );
 
-$VERSION = '0.14';
+$VERSION = '0.15';
 sub Version { $VERSION };
 
 ####################################################################
@@ -42,7 +42,7 @@ B<Data::Walker> - A tool for navigating through Perl data structures
 This module allows you to "walk" an arbitrary Perl data
 structure in the same way that you can walk a directory tree
 from the command line.   It is meant to be used interactively
-with a live user. 
+with a live user, as a command-line interface.
 
 
 =head1 INSTALLATION
@@ -68,7 +68,7 @@ You open a command-line interface by invoking the walk function.
 	use Data::Walker;
 	Data::Walker->walk( $data_structure );
 
-You can customize certain features of the session, like so:
+You can customize certain features, like so:
 
 	use Data::Walker;
 	$Data::Walker::Config{'skipdoublerefs'} = 0;
@@ -161,10 +161,9 @@ Here is a sample interactive session examining this structure ('/>' is the promp
 	/> 
 	
 	
-The following commands are available from within the
-command-line session.  With these commands, you can 
-navigate around the data structure as if it
-were a directory tree.
+The following commands are available from within the CLI.
+With these commands, you can navigate around the data 
+structure as if it were a directory tree.
 
 	cd <target>          like UNIX cd
 	ls                   like UNIX ls (also respects options -a, -l)
@@ -177,39 +176,44 @@ were a directory tree.
 	help set             lists the available config variables
 
 
-For each session, the following items can be configured:
+For each session (or object) the following items can be configured:
 
-	rootname        (default:  '/'    ) how the root node is displayed 
-	refname         (default:  'ref'  ) how embedded refs are listed
-	scalarname      (default: 'scalar') how simple scalars are listed
-	undefname       (default: 'undef' ) how undefined scalars are listed
+	rootname        (default:  '/'    )  displays the root node 
+	refname         (default:  'ref'  )  displays embedded refs
+	scalarname      (default: 'scalar')  displays simple scalars
+	undefname       (default: 'undef' )  displays undefined scalars
 
-	maxdepth        (default:   1  )  maximum dump-depth (Data::Dumper)
-	indent          (default:   1  )  amount of indent (Data::Dumper)
-	lscol1width     (default:  15  )  column widths for 'ls' displays
-	lscol2width     (default:  25  )  column widths for 'ls' displays
+	maxdepth        (default:   1 )  maximum dump-depth (Data::Dumper)
+	indent          (default:   1 )  amount of indent (Data::Dumper)
+	lscol1width     (default:  15 )  column widths for 'ls' displays
+	lscol2width     (default:  25 )  column widths for 'ls' displays
 
-	showrecursion   (default:   1  )  note recursion in the prompt
-	showids         (default:   0  )  show ref id numbers in ls lists
-	skipdoublerefs  (default:   1  )  hop over ref-to-refs during walks
-	skipwarning     (default:   1  )  warn when hopping over ref-to-refs
-	truncatescalars (default:  37  )  truncate scalars in 'ls' displays
+	showrecursion   (default:   1 )  note recursion in the prompt
+	showids         (default:   0 )  show ref id numbers in ls lists
+	skipdoublerefs  (default:   1 )  hop over ref-to-refs during walks
+	skipwarning     (default:   1 )  warn when hopping over ref-to-refs
+	truncatescalars (default:  37 )  truncate scalars in 'ls' displays
 
-	promptchar      (default:  '>' )  customize the session prompt
-	arrowshaft      (default:  '-' )  ('-' in '->')
-	arrowhead       (default:  '>' )  ('>' in '->')
+	promptchar      (default:  '>')  customize the session prompt
+	arrowshaft      (default:  '-')  ('-' in '->')
+	arrowhead       (default:  '>')  ('>' in '->')
 
 
-This is an alpha release of this module.  Future releases
-will include better documentation and tests.  
+This is an alpha release of this module.  
 
 =head1 CHANGES
 
-Version 0.13
+Version 0.15
 
-	Added some installation tests.  
-	Numerous internal changes; one or two bug fixes.
+	Reorganized the installation tests.  
+	A few minor changes to the module itself.
 
+Version 0.13-0.14
+
+	Numerous internal changes:
+	  Moved functionality from the CLI-loop
+	  into distinct functions.
+                  
 Version 0.12
 
 	Blessed references to non-hashes are now handled correctly.
@@ -228,7 +232,7 @@ Version 0.11
 
 =head1 AUTHOR
 
-John Nolan  jpnolan@op.net  August-November 1999.
+John Nolan  jpnolan@op.net  August-December 1999.
 A copyright statment is contained within the source code itself. 
 
 =cut                  
@@ -573,6 +577,16 @@ sub validate_config {
 		unless defined $key;
 	return "Attempt to assign undefined value to key '" . lc($key) . "'" 
 		unless defined $value;
+
+	# Handle empty strings
+	$value = '' if $value eq qq/''/ or $value eq q/""/;
+
+	if ($value =~  /^".*"$/) {
+		 $value =~ s/^"(.*)"$/$1/;
+
+	} elsif ($value =~  /^'.*'$/) {
+		      $value =~ s/^'(.*)'$/$1/;
+	}
 
 	my $msg = "";
 
@@ -1075,8 +1089,8 @@ sub walk {
 			scalarname      how simple scalars are listed ("$$self{scalarname}")
 			undefname       how unefined scalars are listed ("$$self{undefname}")
 			promptchar      customize the session prompt ("$$self{promptchar}")
-			arrowshaft      first part of session prompt ("$$self{arrowshaft}")
-			arrowhead       last part of session prompt ("$$self{arrowhead}")
+			arrowshaft      first part of ref arrow ("$$self{arrowshaft}")
+			arrowhead       last  part of ref arrow ("$$self{arrowhead}")
 
 			maxdepth        maximum dump-depth (Data::Dumper) ($$self{maxdepth})
 			indent          amount of indent (Data::Dumper) ($$self{indent})
@@ -1221,7 +1235,10 @@ sub walk {
 		# At the end of each loop, we might be inside a new directory.  
 		# Figure out what the prompt should look like. 
 		#
-		$self->{temp_namepath} = $self->{namepath};
+		# Take a *copy* of namepath and store it as temp_namepath.
+		#
+		@{ $self->{temp_namepath} } = @{ $self->{namepath} };
+
 		my (%seen,%seen_twice);
 		my $count = 1;
 

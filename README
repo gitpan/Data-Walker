@@ -1,6 +1,5 @@
 NAME
-    Data::Walker - A tool for navigating through Perl data
-    structures
+    Data::Walker - A tool for navigating through Perl data structures
 
 SYNOPSIS
       use Data::Walker;
@@ -8,24 +7,24 @@ SYNOPSIS
       # see below for details
 
 DESCRIPTION
-    This module allows you to "walk" an arbitrary Perl data
-    structure in the same way that you can walk a directory tree
-    from the command line. It is meant to be used interactively with
-    a live user.
+    This module allows you to "walk" an arbitrary Perl data structure in the
+    same way that you can walk a directory tree from the command line. It is
+    meant to be used interactively with a live user, as a command-line
+    interface.
 
 INSTALLATION
-    To install this package, just change to the directory which you
-    created by untarring the package, and type the following:
+    To install this package, just change to the directory which you created
+    by untarring the package, and type the following:
 
             perl Makefile.PL
             make test
             make
             make install
 
-    This will copy Walker.pm to your perl library directory for use
-    by all perl scripts. You probably must be root to do this,
-    unless you have installed a personal copy of perl or you have
-    write access to a Perl lib directory.
+    This will copy Walker.pm to your perl library directory for use by all
+    perl scripts. You probably must be root to do this, unless you have
+    installed a personal copy of perl or you have write access to a Perl lib
+    directory.
 
 USAGE
     You open a command-line interface by invoking the walk function.
@@ -33,14 +32,14 @@ USAGE
             use Data::Walker;
             Data::Walker->walk( $data_structure );
 
-    You can customize certain features of the session, like so:
+    You can customize certain features, like so:
 
             use Data::Walker;
             $Data::Walker::Config{'skipdoublerefs'} = 0;
             Data::Walker->walk( $data_structure );
 
-    If you prefer to use object-style notation, then you can use
-    this syntax to customize the settings:
+    If you prefer to use object-style notation, then you can use this syntax
+    to customize the settings:
 
             use Data::Walker;
             my $w1 = new Data::Walker;
@@ -68,8 +67,8 @@ USAGE
             };
             $s->{e} = \$s->{d};
 
-    Here is a sample interactive session examining this structure
-    ('/>' is the prompt):
+    Here is a sample interactive session examining this structure ('/>' is
+    the prompt):
 
             /> 
             /> ls -l
@@ -125,10 +124,9 @@ USAGE
             /> 
             
             
-    The following commands are available from within the
-    command-line session.  With these commands, you can 
-    navigate around the data structure as if it
-    were a directory tree.
+    The following commands are available from within the CLI.
+    With these commands, you can navigate around the data 
+    structure as if it were a directory tree.
 
             cd <target>          like UNIX cd
             ls                   like UNIX ls (also respects options -a, -l)
@@ -140,39 +138,42 @@ USAGE
             help                 this help message
             help set             lists the available config variables
 
-    For each session, the following items can be configured:
+    For each session (or object) the following items can be configured:
 
-            rootname        (default:  '/'    ) how the root node is displayed 
-            refname         (default:  'ref'  ) how embedded refs are listed
-            scalarname      (default: 'scalar') how simple scalars are listed
-            undefname       (default: 'undef' ) how simple scalars are listed
+            rootname        (default:  '/'    )  displays the root node 
+            refname         (default:  'ref'  )  displays embedded refs
+            scalarname      (default: 'scalar')  displays simple scalars
+            undefname       (default: 'undef' )  displays undefined scalars
 
-            maxdepth        (default:   1  )  maximum dump-depth (Data::Dumper)
-            indent          (default:   1  )  amount of indent (Data::Dumper)
-            lscol1width     (default:  15  )  column widths for 'ls' displays
-            lscol2width     (default:  25  )  column widths for 'ls' displays
+            maxdepth        (default:   1 )  maximum dump-depth (Data::Dumper)
+            indent          (default:   1 )  amount of indent (Data::Dumper)
+            lscol1width     (default:  15 )  column widths for 'ls' displays
+            lscol2width     (default:  25 )  column widths for 'ls' displays
 
-            showrecursion   (default:   1  )  note recursion in the prompt
-            showids         (default:   0  )  show ref id numbers in ls lists
-            skipdoublerefs  (default:   1  )  hop over ref-to-refs during walks
-            skipwarning     (default:   1  )  warn when hopping over ref-to-refs
-            truncatescalars (default:  37  )  truncate scalars in 'ls' displays
+            showrecursion   (default:   1 )  note recursion in the prompt
+            showids         (default:   0 )  show ref id numbers in ls lists
+            skipdoublerefs  (default:   1 )  hop over ref-to-refs during walks
+            skipwarning     (default:   1 )  warn when hopping over ref-to-refs
+            truncatescalars (default:  37 )  truncate scalars in 'ls' displays
 
-            promptchar      (default:  '>' )  customize the session prompt
-            arrowhead       (default:  '>' )  ('>' in '->')
-            arrowshaft      (default:  '-' )  ('-' in '->')
+            promptchar      (default:  '>')  customize the session prompt
+            arrowshaft      (default:  '-')  ('-' in '->')
+            arrowhead       (default:  '>')  ('>' in '->')
 
-    This is an alpha release of this module. Future releases will
-    include better documentation and tests.
+    This is an alpha release of this module.
 
 CHANGES
+    Version 0.15
+
+            Reorganized the installation tests.  
+            A few minor changes to the module itself.
+
     Version 0.13-0.14
 
-            Added some installation tests.
-            Numerous internal changes: 
-               moving functionality from the CLI-loop 
-               into distinct functions. 
-
+            Numerous internal changes:
+              Moved functionality from the CLI-loop
+              into distinct functions.
+                      
     Version 0.12
 
             Blessed references to non-hashes are now handled correctly.
@@ -190,6 +191,6 @@ CHANGES
             Various other small updates.
 
 AUTHOR
-    John Nolan jpnolan@op.net August-November 1999. A copyright
-    statment is contained within the source code itself.
+    John Nolan jpnolan@op.net August-December 1999. A copyright statment is
+    contained within the source code itself.
 

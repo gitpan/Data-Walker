@@ -1,7 +1,7 @@
 Data/Walker.pm
 Makefile.PL
 sample
-test.pl
+t/walker.t
 README
 MANIFEST
 WARNING
